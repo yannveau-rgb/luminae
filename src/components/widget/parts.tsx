@@ -2,6 +2,15 @@
 
 /** Éléments visuels du widget — orbe signature du bot, indicateurs, avatars. */
 
+/**
+ * Orbe du bot — l'élément signature du système « Lumen ».
+ *
+ * `glow` combine `shadow-halo` (valeur de repos) et `animate-halo-breathe`
+ * (respiration). Ce n'est pas redondant : l'animation n'a pas de fill-mode, or
+ * sous `prefers-reduced-motion` globals.css ramène sa durée à 0,01 ms — elle
+ * s'achevait donc aussitôt et l'orbe restait sans aucun halo. Le token garantit
+ * la présence de l'effet, que l'animation joue ou non.
+ */
 export function BotOrb({
   size = 40,
   accent = 'var(--accent)',
@@ -14,7 +23,7 @@ export function BotOrb({
   return (
     <div
       aria-hidden
-      className={`relative shrink-0 rounded-full ${glow ? 'animate-halo-breathe' : ''}`}
+      className={`relative shrink-0 rounded-full ${glow ? 'shadow-halo animate-halo-breathe' : ''}`}
       style={{
         width: size,
         height: size,

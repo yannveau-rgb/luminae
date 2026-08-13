@@ -31,7 +31,12 @@ const config: Config = {
           700: '#1D3A53',
           600: '#2C4E6C',
           500: '#46688A',
-          400: '#6E8DAB',
+          // 400 porte les horodatages, les placeholders et les libellés d'aide,
+          // c'est-à-dire du texte. L'ancien #6E8DAB plafonnait à 3,5:1 sur
+          // blanc ; celui-ci atteint 4,7:1.
+          400: '#5A7794',
+          // 300 est réservé aux SURFACES SOMBRES (navigation admin, connexion),
+          // où il donne 8:1. Sur blanc il tombe à 2,2:1 — ne pas l'y employer.
           300: '#9FB4C8'
         },
         lagoon: {
@@ -47,7 +52,10 @@ const config: Config = {
         },
         aurora: {
           DEFAULT: '#2FC6D4',
-          600: '#1BA3B1',
+          // 600 est le ton de PREMIER PLAN (texte du badge « Bot »). L'ancien
+          // #1BA3B1 ne donnait que 2,7:1 sur aurora-100 ; celui-ci atteint
+          // 4,5:1, le seuil WCAG AA. Pour un aplat décoratif, utiliser 500.
+          600: '#0F7A86',
           500: '#2FC6D4',
           400: '#5EDAE5',
           300: '#9BE9F0',
@@ -55,7 +63,12 @@ const config: Config = {
         },
         sun: {
           DEFAULT: '#F2A63B',
-          600: '#D98A1F',
+          /** État survolé de sun-600 en aplat (texte blanc : 7,7:1). */
+          700: '#7A4700',
+          // Idem : #D98A1F ne donnait que 2,4:1 sur sun-100 et 2,8:1 sur blanc.
+          // #9A5B00 monte à 4,6:1 et 5,4:1, et reste lisible en aplat sous du
+          // texte blanc (5,4:1) — ce que l'ambre DEFAULT ne permet pas (2,0:1).
+          600: '#9A5B00',
           500: '#F2A63B',
           300: '#F8C87E',
           100: '#FCEBD1',
@@ -71,8 +84,17 @@ const config: Config = {
         },
         mist: {
           DEFAULT: '#F4F7F9',
+          // 50 / 100 / 200 manquaient à l'échelle alors que le code les
+          // utilisait déjà : Tailwind ne générait rien, sans erreur, et les
+          // fonds concernés étaient simplement absents (page d'accueil, bande
+          // Copilot, survol de la liste de conversations).
+          50: '#FBFCFD',
+          100: '#F4F7F9',
+          200: '#E9EFF3',
           300: '#DCE5EB',
           400: '#C3D1DB',
+          // 500 et 600 sont des tons de BORDURE et d'icône : trop clairs pour
+          // du texte sur blanc (2,2:1 et 3,1:1). Pour du texte, voir `ink`.
           500: '#9FB2C0',
           600: '#7C93A4'
         }
@@ -84,7 +106,12 @@ const config: Config = {
       boxShadow: {
         panel: '0 12px 40px -8px rgba(8, 22, 36, 0.22), 0 2px 8px rgba(8, 22, 36, 0.08)',
         bubble: '0 1px 2px rgba(8, 22, 36, 0.06), 0 6px 20px -6px rgba(8, 22, 36, 0.12)',
-        launcher: '0 8px 28px -4px rgba(14, 140, 125, 0.45), 0 2px 6px rgba(8, 22, 36, 0.2)',
+        // `glow` / `glow-sm` étaient employés par la page d'accueil sans jamais
+        // avoir été définis : les deux appels à l'action et le bloc
+        // d'intégration n'avaient donc aucune ombre. Teintés lagoon/aurora
+        // plutôt que neutres — c'est la lumière qui signe le système « Lumen ».
+        'glow-sm': '0 4px 16px -4px rgba(14, 140, 125, 0.34), 0 1px 3px rgba(8, 22, 36, 0.08)',
+        glow: '0 14px 40px -12px rgba(47, 198, 212, 0.40), 0 2px 10px rgba(8, 22, 36, 0.14)',
         halo: '0 0 0 6px rgba(47, 198, 212, 0.12), 0 0 24px rgba(47, 198, 212, 0.35)'
       },
       keyframes: {

@@ -331,7 +331,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
           disabled={sending}
           className={cn(
             'h-11 shrink-0 rounded-xl px-4 text-sm font-semibold text-white transition disabled:opacity-40',
-            noteMode ? 'bg-sun hover:bg-sun-600' : 'bg-lagoon-600 hover:bg-lagoon-700'
+            noteMode ? 'bg-sun-600 hover:bg-sun-700' : 'bg-lagoon-600 hover:bg-lagoon-700'
           )}
         >
           {sending ? '…' : noteMode ? 'Noter' : 'Envoyer'}
