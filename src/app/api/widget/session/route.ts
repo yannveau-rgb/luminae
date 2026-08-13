@@ -23,14 +23,16 @@ export async function POST(req: Request) {
     // upsert idempotent sur `token` : évite la race condition « duplicate key »
     // quand deux requêtes /session partent en même temps (double montage React en dev,
     // onglets multiples). `ignoreDuplicates: false` met aussi à jour last_seen_at.
-    let { data: visitor } = await db
+    let { data: visitor, error: upsertErr } = await db
       .from('visitors')
       .upsert({ token, last_seen_at: new Date().toISOString() }, { onConflict: 'token' })
       .select('*')
       .single();
+    if (upsertErr) console.error('[widget/session] upsert error', upsertErr);
     if (!visitor) {
       // Repli : l'upsert peut ne rien retourner selon la config ; on relit.
-      const { data: existing } = await db.from('visitors').select('*').eq('token', token).maybeSingle();
+      const { data: existing, error: selectErr } = await db.from('visitors').select('*').eq('token', token).maybeSingle();
+      if (selectErr) console.error('[widget/session] select error', selectErr);
       visitor = existing;
     }
     if (!visitor) {
