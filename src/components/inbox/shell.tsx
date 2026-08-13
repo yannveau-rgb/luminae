@@ -157,9 +157,19 @@ export function InboxShell({
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-mist">
-      {/* Colonne liste */}
-      <aside className="flex w-[360px] shrink-0 flex-col border-r border-mist-300 bg-white">
+    // `100dvh` et non `h-screen` : sur mobile, `vh` inclut la barre d'adresse
+    // rétractable, ce qui poussait le composeur hors de l'écran.
+    <div className="flex h-[100dvh] overflow-hidden bg-mist">
+      {/* Colonne liste — plein écran sur mobile, colonne fixe à partir de md.
+          Sous md, liste et conversation ne coexistent pas : la route
+          /inbox/[id] existant déjà, la navigation entre les deux est native
+          (et le retour navigateur fonctionne). */}
+      <aside
+        className={cn(
+          'flex w-full min-w-0 shrink-0 flex-col border-r border-mist-300 bg-white md:w-[360px]',
+          selectedId && 'hidden md:flex'
+        )}
+      >
         <header className="flex items-center justify-between border-b border-mist-300 px-4 py-3">
           <Link href="/inbox" className="flex items-center gap-2">
             <BotOrb size={26} glow={false} />
@@ -329,10 +339,12 @@ export function InboxShell({
         </ul>
       </aside>
 
-      {/* Zone principale */}
-      <main className="flex min-w-0 flex-1 flex-col">
+      {/* Zone principale — masquée sous md quand aucune conversation n'est
+          sélectionnée : l'invitation « Sélectionnez une conversation » n'a pas
+          de sens quand la liste occupe déjà tout l'écran. */}
+      <main className={cn('flex min-w-0 flex-1 flex-col', !selectedId && 'hidden md:flex')}>
         {children ?? (
-          <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
             <BotOrb size={54} glow />
             <div>
               <p className="font-display text-lg font-semibold">Sélectionnez une conversation</p>

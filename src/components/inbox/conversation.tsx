@@ -3,6 +3,7 @@
 /** Espace de travail d'une conversation : fil, actions, composeur. */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { BotOrb, TypingDots } from '@/components/widget/parts';
 import { cn, formatDay, formatTime, timeAgo } from '@/lib/utils';
@@ -297,9 +298,21 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
   return (
     <div className="flex min-h-0 flex-1">
       <section className="flex min-w-0 flex-1 flex-col bg-mist">
-        {/* En-tête conversation */}
-        <header className="flex items-center justify-between gap-3 border-b border-mist-300 bg-white px-5 py-3">
-          <div className="flex min-w-0 items-center gap-3">
+        {/* En-tête conversation — les actions passent sous l'identité quand la
+            largeur ne suffit plus, plutôt que de comprimer les deux. */}
+        <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-mist-300 bg-white px-4 py-3 md:px-5">
+          <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
+            {/* Sous md, la liste et la conversation ne coexistent pas : sans ce
+                retour, la conversation serait un cul-de-sac. */}
+            <Link
+              href="/inbox"
+              aria-label="Retour à la liste des conversations"
+              className="-ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-500 transition hover:bg-mist md:hidden"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </Link>
             <Avatar name={visitor?.display_name ?? 'Visiteur'} size={36} />
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -312,7 +325,7 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
               </p>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             {canTake && (
               <button
                 onClick={() => doAction('take')}
