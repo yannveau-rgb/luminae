@@ -1,0 +1,29 @@
+# dépendances
+/node_modules
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+
+# production
+/build
+
+# divers
+*.tsbuildinfo
+.DS_Store
+.vercel
+*.log
+supa-push.txt
+
+# env — ne jamais committer les secrets
+.env
+.env.local
+.env.*.local
+
+# passation (contient des identifiants)
+HANDOVER.md
+
+# supabase local
+supabase/.temp
+supabase/.branches

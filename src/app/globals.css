@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Accent du widget — surchargé à la volée par bot_settings.accent_color */
+  --accent: #0e8c7d;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply bg-mist text-ink antialiased;
+  font-feature-settings: 'cv02', 'cv03';
+}
+
+/* Focus clavier toujours visible */
+:focus-visible {
+  outline: 2px solid var(--focus-color, #2fc6d4);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Barres de défilement discrètes */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c3d1db transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #c3d1db;
+  border-radius: 8px;
+}
+
+/* Lien « souligné doux » pour le contenu riche */
+.rich-content a {
+  @apply underline decoration-aurora decoration-2 underline-offset-2;
+}
+.rich-content ul {
+  @apply list-disc pl-5 space-y-1;
+}
+.rich-content ol {
+  @apply list-decimal pl-5 space-y-1;
+}
+.rich-content p + p,
+.rich-content div + div {
+  margin-top: 0.4em;
+}
+
+/* Respect des préférences de réduction de mouvement */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
