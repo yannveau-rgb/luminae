@@ -3,6 +3,8 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { broadcast } from '@/lib/broadcast';
 import { runBotPipeline } from '@/lib/bot-engine';
 import { notifyAgents } from '@/lib/notify';
+import { enforce, WIDGET_RULES } from '@/lib/rate-limit';
+import { tryMintVisitorToken } from '@/lib/visitor-token';
 import { isUuid } from '@/lib/utils';
 import type { Database } from '@/lib/supabase/database.types';
 import type { VisitorContext } from '@/lib/types';
@@ -30,6 +32,11 @@ export async function POST(req: Request) {
     if (!isUuid(token) || !text) {
       return NextResponse.json({ error: 'Requête invalide.' }, { status: 400 });
     }
+
+    // Quota AVANT tout travail : cette route déclenche un embedding puis une
+    // complétion Mistral. C'est le point le plus coûteux de la surface publique.
+    const limited = await enforce(WIDGET_RULES.message, req, token);
+    if (limited) return limited;
 
     const db = supabaseAdmin();
     // upsert idempotent : pas de « duplicate key » si le visiteur arrive en parallèle.
@@ -116,7 +123,17 @@ export async function POST(req: Request) {
 
     // Statut à jour (l'escalade a pu passer la conversation en « waiting »).
     const { data: fresh } = await db.from('conversations').select('id, status').eq('id', conv.id).single();
-    return NextResponse.json({ conversationId: conv.id, status: fresh?.status ?? conv.status });
+
+    // Jeton Realtime rafraîchi : indispensable si l'id retenu diffère de celui
+    // demandé (collision de clé, la base a généré le sien) — sinon le widget
+    // resterait abonné à un canal qui ne recevra jamais rien.
+    const realtime = tryMintVisitorToken({ visitorId: visitor.id, conversationId: conv.id });
+
+    return NextResponse.json({
+      conversationId: conv.id,
+      status: fresh?.status ?? conv.status,
+      realtimeToken: realtime?.token ?? null
+    });
   } catch (err: any) {
     console.error('[widget/messages]', err);
     return NextResponse.json({ error: 'Le message n’a pas pu être envoyé. Réessayez.' }, { status: 500 });

@@ -60,11 +60,19 @@ export const branding = {
     ] as { date: string; name: string }[]
   },
 
-  /** Compte admin initial créé au seed (à remplacer avant tout déploiement réel). */
+  /**
+   * Compte admin initial créé au seed.
+   *
+   * Le mot de passe n'est JAMAIS écrit ici : il vient de SEED_ADMIN_PASSWORD.
+   * L'ancienne valeur en clair (« Luminae-Admin-2026! ») a été versionnée et
+   * doit être considérée comme compromise — si un compte l'utilise encore,
+   * changez-le. L'e-mail est également surchargeable pour éviter de créer un
+   * compte à une adresse d'exemple en production.
+   */
   seedAdmin: {
-    email: 'admin@luminae.example',
-    fullName: 'Administrateur Luminae',
-    temporaryPassword: 'Luminae-Admin-2026!'
+    email: process.env.SEED_ADMIN_EMAIL ?? 'admin@luminae.example',
+    fullName: process.env.SEED_ADMIN_NAME ?? 'Administrateur Luminae',
+    temporaryPassword: process.env.SEED_ADMIN_PASSWORD ?? null
   }
 };
 

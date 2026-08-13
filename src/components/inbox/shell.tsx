@@ -87,28 +87,46 @@ export function InboxShell({
   }, [loadNotifs]);
 
   // Temps réel : mises à jour de la boîte + notifications personnelles.
+  // Canaux PRIVÉS : l'abonnement est vérifié contre les policies de
+  // `realtime.messages` (migration 0010). Le JWT de session de l'agent est
+  // présenté explicitement à Realtime avant l'abonnement.
   useEffect(() => {
-    const inbox = supabase.channel('inbox:all');
-    inbox.on('broadcast', { event: 'inbox:update' }, () => load(tab === 'resolved')).subscribe();
-    const perso = supabase.channel(`agent:${agent.id}`);
-    perso
-      .on('broadcast', { event: 'notification:new' }, ({ payload }: { payload: AppNotification }) => {
-        setNotifs((n) => [payload, ...n.filter((x) => x.id !== payload.id)]);
-        const alreadyOnConversation = Boolean(payload.conversation_id) && payload.conversation_id === selectedId;
-        if (alreadyOnConversation && document.hasFocus()) return;
-        playNotificationSound();
-        showBrowserNotification({
-          title: payload.title,
-          body: payload.body,
-          onClick: () => {
-            if (payload.conversation_id) router.push(`/inbox/${payload.conversation_id}`);
-          }
-        });
-      })
-      .subscribe();
+    let inbox: ReturnType<typeof supabase.channel> | null = null;
+    let perso: ReturnType<typeof supabase.channel> | null = null;
+    let disposed = false;
+
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      const accessToken = data.session?.access_token;
+      if (!accessToken || disposed) return;
+      await supabase.realtime.setAuth(accessToken);
+      if (disposed) return;
+
+      inbox = supabase.channel('inbox:all', { config: { private: true } });
+      inbox.on('broadcast', { event: 'inbox:update' }, () => load(tab === 'resolved')).subscribe();
+
+      perso = supabase.channel(`agent:${agent.id}`, { config: { private: true } });
+      perso
+        .on('broadcast', { event: 'notification:new' }, ({ payload }: { payload: AppNotification }) => {
+          setNotifs((n) => [payload, ...n.filter((x) => x.id !== payload.id)]);
+          const alreadyOnConversation = Boolean(payload.conversation_id) && payload.conversation_id === selectedId;
+          if (alreadyOnConversation && document.hasFocus()) return;
+          playNotificationSound();
+          showBrowserNotification({
+            title: payload.title,
+            body: payload.body,
+            onClick: () => {
+              if (payload.conversation_id) router.push(`/inbox/${payload.conversation_id}`);
+            }
+          });
+        })
+        .subscribe();
+    })();
+
     return () => {
-      supabase.removeChannel(inbox);
-      supabase.removeChannel(perso);
+      disposed = true;
+      if (inbox) supabase.removeChannel(inbox);
+      if (perso) supabase.removeChannel(perso);
     };
   }, [supabase, agent.id, tab, load, selectedId, router]);
 

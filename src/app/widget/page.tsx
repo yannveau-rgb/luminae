@@ -64,17 +64,47 @@ function getVisitorToken(): string {
   }
 }
 
+/**
+ * Vérifie qu'un émetteur ne déclare que sa propre URL.
+ *
+ * L'écoute `postMessage` ne contrôlait pas l'origine : n'importe quelle fenêtre
+ * pouvait annoncer l'URL de son choix, laquelle finissait en base
+ * (`conversations.source_url`), dans les prompts Mistral et sous les yeux des
+ * agents (constat S-06). Plutôt qu'une liste blanche à dupliquer côté client,
+ * on exige que l'origine du message et celle de l'URL annoncée coïncident : un
+ * site ne peut donc parler que pour lui-même. Le contrôle de « qui a le droit
+ * de nous cadrer » reste assuré par `frame-ancestors` côté serveur.
+ */
+function claimedUrlFrom(event: MessageEvent): string | null {
+  if (!event.data || event.data.type !== 'luminae:init') return null;
+  const href = typeof event.data.href === 'string' ? event.data.href : '';
+  if (!href) return null;
+
+  const claimed = new URL(href); // lève si l'URL est invalide — attrapé plus haut
+  if (claimed.protocol !== 'http:' && claimed.protocol !== 'https:') return null;
+  // « null » = origine opaque (sandbox, data:) : jamais digne de confiance.
+  if (event.origin === 'null' || claimed.origin !== event.origin) return null;
+
+  return href;
+}
+
 /** URL de la page hôte : transmise par embed.js (postMessage), sinon referrer. */
 function detectPageUrl(): Promise<string> {
   return new Promise((resolve) => {
     const fallback = () => resolve(document.referrer || window.location.href);
     const timer = setTimeout(fallback, 500);
     const onMsg = (e: MessageEvent) => {
-      if (e.data && e.data.type === 'luminae:init') {
-        clearTimeout(timer);
-        window.removeEventListener('message', onMsg);
-        resolve(e.data.href || document.referrer || window.location.href);
+      let href: string | null = null;
+      try {
+        href = claimedUrlFrom(e);
+      } catch {
+        href = null; // origine inexploitable (opaque, protocole exotique)
       }
+      // Un message rejeté ne clôt pas l'écoute : le message légitime peut suivre.
+      if (!href) return;
+      clearTimeout(timer);
+      window.removeEventListener('message', onMsg);
+      resolve(href);
     };
     window.addEventListener('message', onMsg);
   });
@@ -90,6 +120,10 @@ export default function WidgetPage() {
   const [typingFrom, setTypingFrom] = useState<'bot' | 'agent' | null>(null);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  /** Jeton signé par le serveur : autorise l'abonnement au canal privé. */
+  const [realtimeToken, setRealtimeToken] = useState<string | null>(null);
+  /** La conversation existe-t-elle côté serveur (au moins un message envoyé) ? */
+  const [conversationStarted, setConversationStarted] = useState(false);
 
   const tokenRef = useRef<string>(getVisitorToken());
   const contextRef = useRef<VisitorContext>({ url: '', os: '', browser: '', device_type: '' });
@@ -120,8 +154,13 @@ export default function WidgetPage() {
         setSettings(data.settings);
         setMessages(data.messages ?? []);
         setFeedbacks(data.feedback ?? {});
+        // Le serveur fournit l'identifiant du canal — celui de la conversation
+        // en cours, ou un identifiant pré-alloué pour la prochaine. On peut donc
+        // s'abonner avant le premier message sans choisir soi-même une clé.
+        if (data.conversationId) setConversationId(data.conversationId);
+        setRealtimeToken(data.realtimeToken ?? null);
         if (data.conversation) {
-          setConversationId(data.conversation.id);
+          setConversationStarted(true);
           setStatus(data.conversation.status);
         }
         setPhase('ready');
@@ -135,41 +174,53 @@ export default function WidgetPage() {
   }, []);
 
   // ── Temps réel : nouveaux messages, saisie, statut ─────────────────────
+  // Canal PRIVÉ : Realtime vérifie l'abonnement contre les policies de
+  // `realtime.messages` (migration 0010). Le jeton présenté ici ne donne accès
+  // qu'au canal de cette conversation — la clé anon seule n'ouvre plus rien.
   useEffect(() => {
-    if (!conversationId) return;
+    if (!conversationId || !realtimeToken) return;
     const supabase = supabaseBrowser();
-    const channel = supabase
-      .channel(`conv:${conversationId}`)
-      .on('broadcast', { event: 'message:new' }, ({ payload }: { payload: any }) => {
-        const msg = payload as UiMessage;
-        setMessages((prev) => {
-          if (prev.some((m) => m.id === msg.id)) return prev;
-          if (msg.sender === 'visitor') {
-            const idx = prev.findIndex((m) => m.temp && m.content === msg.content);
-            if (idx >= 0) {
-              const copy = [...prev];
-              copy[idx] = msg;
-              return copy;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let disposed = false;
+
+    (async () => {
+      await supabase.realtime.setAuth(realtimeToken);
+      if (disposed) return;
+      channel = supabase
+        .channel(`conv:${conversationId}`, { config: { private: true } })
+        .on('broadcast', { event: 'message:new' }, ({ payload }: { payload: any }) => {
+          const msg = payload as UiMessage;
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === msg.id)) return prev;
+            if (msg.sender === 'visitor') {
+              const idx = prev.findIndex((m) => m.temp && m.content === msg.content);
+              if (idx >= 0) {
+                const copy = [...prev];
+                copy[idx] = msg;
+                return copy;
+              }
             }
-          }
-          return [...prev, msg];
-        });
-        setTypingFrom(null);
-        scrollBottom();
-      })
-      .on('broadcast', { event: 'typing' }, ({ payload }: { payload: any }) => {
-        const p = payload as { from: string; on: boolean };
-        if (p.from !== 'visitor') setTypingFrom(p.on ? (p.from === 'agent' ? 'agent' : 'bot') : null);
-      })
-      .on('broadcast', { event: 'conversation:update' }, ({ payload }: { payload: any }) => {
-        const p = payload as { status?: Status };
-        if (p.status) setStatus(p.status);
-      })
-      .subscribe();
+            return [...prev, msg];
+          });
+          setTypingFrom(null);
+          scrollBottom();
+        })
+        .on('broadcast', { event: 'typing' }, ({ payload }: { payload: any }) => {
+          const p = payload as { from: string; on: boolean };
+          if (p.from !== 'visitor') setTypingFrom(p.on ? (p.from === 'agent' ? 'agent' : 'bot') : null);
+        })
+        .on('broadcast', { event: 'conversation:update' }, ({ payload }: { payload: any }) => {
+          const p = payload as { status?: Status };
+          if (p.status) setStatus(p.status);
+        })
+        .subscribe();
+    })();
+
     return () => {
-      supabase.removeChannel(channel);
+      disposed = true;
+      if (channel) supabase.removeChannel(channel);
     };
-  }, [conversationId, scrollBottom]);
+  }, [conversationId, realtimeToken, scrollBottom]);
 
   useEffect(() => {
     if (phase === 'ready') scrollBottom();
@@ -182,13 +233,10 @@ export default function WidgetPage() {
       if (!text || sending) return;
       setSending(true);
       setInput('');
-      // Nouvelle conversation : on fixe l'id côté client pour s'abonner au canal
-      // Realtime AVANT que le bot ne réponde (sinon la 1re réponse serait ratée).
-      let convId = conversationId;
-      if (!convId) {
-        convId = uuid();
-        setConversationId(convId);
-      }
+      // L'identifiant vient de /api/widget/session, qui l'a pré-alloué et nous a
+      // délivré le jeton du canal correspondant : on est déjà abonné, la première
+      // réponse du bot ne peut plus être ratée.
+      const convId = conversationId;
       const temp: UiMessage = {
         id: `temp-${Date.now()}`,
         sender: 'visitor',
@@ -212,15 +260,38 @@ export default function WidgetPage() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? 'Envoi impossible');
         setConversationId(data.conversationId);
+        // Le serveur peut avoir retenu un autre id (collision de clé) : le jeton
+        // renvoyé est celui du canal réellement utilisé, il faut le reprendre.
+        if (data.realtimeToken) setRealtimeToken(data.realtimeToken);
+        setConversationStarted(true);
         if (data.status) setStatus(data.status);
         setMessages((prev) => prev.map((m) => (m.id === temp.id ? { ...m, failed: false } : m)));
+
+        // Repli sans temps réel (jeton indisponible, p. ex. SUPABASE_JWT_SECRET
+        // non configurée) : le pipeline bot s'est exécuté pendant la requête, on
+        // relit donc la conversation pour afficher sa réponse.
+        if (!data.realtimeToken && !realtimeToken) {
+          const again = await fetch('/api/widget/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: tokenRef.current })
+          });
+          if (again.ok) {
+            const fresh = await again.json();
+            if (Array.isArray(fresh.messages) && fresh.messages.length > 0) {
+              setMessages(fresh.messages);
+              setFeedbacks(fresh.feedback ?? {});
+            }
+            if (fresh.conversation?.status) setStatus(fresh.conversation.status);
+          }
+        }
       } catch {
         setMessages((prev) => prev.map((m) => (m.id === temp.id ? { ...m, failed: true } : m)));
       } finally {
         setSending(false);
       }
     },
-    [conversationId, sending, scrollBottom]
+    [conversationId, realtimeToken, sending, scrollBottom]
   );
 
   const vote = useCallback(
@@ -246,7 +317,9 @@ export default function WidgetPage() {
   );
 
   const askHuman = useCallback(async () => {
-    if (!conversationId) {
+    // Tant qu'aucun message n'a été envoyé, la conversation n'existe pas encore
+    // en base (seul son identifiant est réservé) : on l'ouvre par un message.
+    if (!conversationId || !conversationStarted) {
       await send('Je souhaite parler à un agent, merci.');
       return;
     }
@@ -261,40 +334,41 @@ export default function WidgetPage() {
     } catch {
       /* le statut sera resynchronisé au prochain message */
     }
-  }, [conversationId, send]);
+  }, [conversationId, conversationStarted, send]);
 
   /** Indicateur de saisie du visiteur, relayé vers les agents (throttlé). */
   const onInput = useCallback(
     (value: string) => {
       setInput(value);
-      if (!conversationId) return;
+      // La route exige désormais le token visiteur et vérifie qu'il correspond
+      // bien à la conversation ; inutile d'appeler avant le premier message.
+      if (!conversationId || !conversationStarted) return;
+      const ping = (typing: boolean) =>
+        fetch('/api/widget/typing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversationId, typing, token: tokenRef.current })
+        }).catch(() => {});
+
       const now = Date.now();
       if (now - lastTypingSent.current > 1500) {
         lastTypingSent.current = now;
-        fetch('/api/widget/typing', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ conversationId, typing: true })
-        }).catch(() => {});
+        ping(true);
       }
       if (typingTimer.current) clearTimeout(typingTimer.current);
-      typingTimer.current = setTimeout(() => {
-        fetch('/api/widget/typing', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ conversationId, typing: false })
-        }).catch(() => {});
-      }, 2000);
+      typingTimer.current = setTimeout(() => ping(false), 2000);
     },
-    [conversationId]
+    [conversationId, conversationStarted]
   );
 
   const accent = settings?.accent_color ?? '#0E8C7D';
   const botName = settings?.bot_name ?? 'Assistant';
   const hasVisitorMessage = messages.some((m) => m.sender === 'visitor');
+  // Le visiteur doit savoir à qui il parle : « En ligne » laissait croire à une
+  // présence humaine. La mention disparaît dès qu'un agent prend le relais.
   const statusLine =
     status === 'bot'
-      ? 'En ligne · répond en quelques secondes'
+      ? 'Assistant automatique · réponse immédiate'
       : status === 'waiting'
         ? 'Vous êtes en file d’attente'
         : status === 'assigned'
@@ -526,7 +600,7 @@ export default function WidgetPage() {
           </button>
         )}
       </footer>
-      <p className="bg-white pb-2 text-center text-[10.5px] text-mist-500">
+      <p className="bg-white pb-2 text-center text-[10.5px] text-ink-400">
         Propulsé par <span className="font-display font-semibold">Luminae</span>
       </p>
     </main>

@@ -1,13 +1,18 @@
+import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { signAttachments } from '@/lib/storage';
+import { enforce, WIDGET_RULES } from '@/lib/rate-limit';
+import { tryMintVisitorToken } from '@/lib/visitor-token';
 import { isUuid } from '@/lib/utils';
 import type { Attachment, WidgetSettings } from '@/lib/types';
 
 /**
  * POST /api/widget/session
  * Ouvre (ou reprend) la session visiteur : crée le visiteur si besoin,
- * retourne les réglages publics du bot + la conversation active éventuelle.
+ * retourne les réglages publics du bot + la conversation active éventuelle,
+ * ainsi que le jeton Realtime qui autorise l'abonnement au canal privé de
+ * cette conversation (et d'elle seule).
  */
 export async function POST(req: Request) {
   try {
@@ -16,6 +21,9 @@ export async function POST(req: Request) {
     if (!isUuid(token)) {
       return NextResponse.json({ error: 'Token visiteur invalide.' }, { status: 400 });
     }
+
+    const limited = await enforce(WIDGET_RULES.session, req, token);
+    if (limited) return limited;
 
     const db = supabaseAdmin();
 
@@ -96,7 +104,22 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ visitorId: visitor.id, settings, conversation: active, messages, feedback });
+    // Identifiant du canal Realtime. S'il n'y a pas de conversation active, on
+    // en pré-alloue un côté serveur : le widget peut ainsi s'abonner AVANT
+    // d'envoyer son premier message (sinon il raterait la réponse du bot), sans
+    // que le client ait à choisir lui-même une clé primaire.
+    const conversationId = active?.id ?? randomUUID();
+    const realtime = tryMintVisitorToken({ visitorId: visitor.id, conversationId });
+
+    return NextResponse.json({
+      visitorId: visitor.id,
+      settings,
+      conversation: active,
+      messages,
+      feedback,
+      conversationId,
+      realtimeToken: realtime?.token ?? null
+    });
   } catch (err: any) {
     console.error('[widget/session]', err);
     return NextResponse.json({ error: 'Impossible de charger la session.' }, { status: 500 });

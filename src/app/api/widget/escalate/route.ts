@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { escalateConversation } from '@/lib/bot-engine';
+import { enforce, WIDGET_RULES } from '@/lib/rate-limit';
 import { isUuid } from '@/lib/utils';
 import type { BotSettings } from '@/lib/types';
 
@@ -15,6 +16,9 @@ export async function POST(req: Request) {
     if (!isUuid(token) || !isUuid(conversationId)) {
       return NextResponse.json({ error: 'Requête invalide.' }, { status: 400 });
     }
+
+    const limited = await enforce(WIDGET_RULES.escalate, req, token);
+    if (limited) return limited;
 
     const db = supabaseAdmin();
     const { data: visitor } = await db.from('visitors').select('id').eq('token', token).maybeSingle();

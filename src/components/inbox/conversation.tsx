@@ -80,27 +80,41 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [messages, visitorTyping]);
 
-  // Temps réel du canal conversation.
+  // Temps réel du canal conversation (canal PRIVÉ — voir migration 0010).
   useEffect(() => {
-    const ch = supabase.channel(`conv:${conversationId}`);
+    let ch: ReturnType<typeof supabase.channel> | null = null;
+    let disposed = false;
+
     const append = (payload: Message) => {
       if (!payload?.id) return;
       setMessages((ms) => (ms.some((m) => m.id === payload.id) ? ms : [...ms, payload]));
     };
-    ch.on('broadcast', { event: 'message:new' }, ({ payload }: { payload: Message }) => {
-      if (payload?.internal_note) return; // diffusée uniquement via note:new
-      append(payload);
-    })
-      .on('broadcast', { event: 'note:new' }, ({ payload }: { payload: Message }) => append(payload))
-      .on('broadcast', { event: 'conversation:update' }, ({ payload }: { payload: Partial<Conversation> }) => {
-        setConv((c) => (c ? { ...c, ...payload } : c));
+
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      const accessToken = data.session?.access_token;
+      if (!accessToken || disposed) return;
+      await supabase.realtime.setAuth(accessToken);
+      if (disposed) return;
+
+      ch = supabase.channel(`conv:${conversationId}`, { config: { private: true } });
+      ch.on('broadcast', { event: 'message:new' }, ({ payload }: { payload: Message }) => {
+        if (payload?.internal_note) return; // diffusée uniquement via note:new
+        append(payload);
       })
-      .on('broadcast', { event: 'typing' }, ({ payload }: { payload: { from?: string; on?: boolean } }) => {
-        if (payload?.from === 'visitor') setVisitorTyping(!!payload.on);
-      })
-      .subscribe();
+        .on('broadcast', { event: 'note:new' }, ({ payload }: { payload: Message }) => append(payload))
+        .on('broadcast', { event: 'conversation:update' }, ({ payload }: { payload: Partial<Conversation> }) => {
+          setConv((c) => (c ? { ...c, ...payload } : c));
+        })
+        .on('broadcast', { event: 'typing' }, ({ payload }: { payload: { from?: string; on?: boolean } }) => {
+          if (payload?.from === 'visitor') setVisitorTyping(!!payload.on);
+        })
+        .subscribe();
+    })();
+
     return () => {
-      supabase.removeChannel(ch);
+      disposed = true;
+      if (ch) supabase.removeChannel(ch);
     };
   }, [supabase, conversationId]);
 
@@ -447,7 +461,9 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
                   onClick={() => setNoteMode(true)}
                   className={cn(
                     'rounded-full px-3 py-1 text-xs font-medium transition',
-                    noteMode ? 'bg-sun text-white' : 'text-ink-500 hover:bg-mist'
+                    // sun-600 et non l'ambre DEFAULT : sous du texte blanc,
+                    // celui-ci ne donnait que 2,0:1.
+                    noteMode ? 'bg-sun-600 text-white' : 'text-ink-500 hover:bg-mist'
                   )}
                 >
                   Note interne

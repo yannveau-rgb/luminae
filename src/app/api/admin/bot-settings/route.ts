@@ -51,8 +51,38 @@ export async function PUT(req: Request) {
     if (Number.isInteger(body.rag_top_k) && body.rag_top_k >= 1 && body.rag_top_k <= 10) {
       patch.rag_top_k = body.rag_top_k;
     }
+    // L'avatar est rendu dans une balise <img> servie sur TOUS les sites
+    // clients : un URL arbitraire y devient un pixel de traçage à l'échelle du
+    // parc. On impose donc https, et on écarte les hôtes internes (constat S-15).
     if (typeof body.avatar_url === 'string') {
-      patch.avatar_url = body.avatar_url.trim() || null;
+      const raw = body.avatar_url.trim();
+      if (!raw) {
+        patch.avatar_url = null;
+      } else {
+        let accepted: string | null = null;
+        try {
+          const parsed = new URL(raw);
+          const host = parsed.hostname.toLowerCase();
+          const isLocal =
+            host === 'localhost' ||
+            host === '::1' ||
+            /^127\./.test(host) ||
+            /^10\./.test(host) ||
+            /^192\.168\./.test(host) ||
+            /^169\.254\./.test(host) ||
+            /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+          if (parsed.protocol === 'https:' && !isLocal) accepted = parsed.toString();
+        } catch {
+          accepted = null;
+        }
+        if (!accepted) {
+          return NextResponse.json(
+            { error: 'L’avatar doit être une adresse https publique.' },
+            { status: 400 }
+          );
+        }
+        patch.avatar_url = accepted;
+      }
     }
 
     const { data: settings, error } = await supabaseAdmin()
