@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { AuthError, requireAgent } from '@/lib/auth';
 import { InboxShell } from '@/components/inbox/shell';
@@ -12,13 +13,14 @@ export default async function InboxPage() {
     agent = await requireAgent();
   } catch (err) {
     if (err instanceof AuthError) {
-      // Pas de session : la page de connexion est la bonne destination.
       if (err.code === 'no_session') redirect('/login');
-      // Session valide mais compte hors de l'équipe : surtout ne pas renvoyer
-      // vers /login, qui rebondit vers ici dès qu'une session existe.
       return <AccessDenied message={err.message} />;
     }
     throw err;
   }
-  return <InboxShell agent={agent} selectedId={null} />;
+  return (
+    <Suspense fallback={<div className="flex h-screen items-center justify-center bg-mist text-sm text-ink-400">Chargement…</div>}>
+      <InboxShell agent={agent} selectedId={null} />
+    </Suspense>
+  );
 }

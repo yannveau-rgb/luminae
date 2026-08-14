@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { AuthError, requireAgent } from '@/lib/auth';
 import { InboxShell } from '@/components/inbox/shell';
@@ -19,8 +20,10 @@ export default async function ConversationPage({ params }: { params: { id: strin
     throw err;
   }
   return (
-    <InboxShell agent={agent} selectedId={params.id}>
-      <ConversationView conversationId={params.id} agent={agent} />
-    </InboxShell>
+    <Suspense fallback={<div className="flex h-screen items-center justify-center bg-mist text-sm text-ink-400">Chargement…</div>}>
+      <InboxShell agent={agent} selectedId={params.id}>
+        <ConversationView conversationId={params.id} agent={agent} />
+      </InboxShell>
+    </Suspense>
   );
 }
