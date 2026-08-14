@@ -1,6 +1,6 @@
 'use client';
 
-/** Espace de travail d'une conversation : fil, actions, composeur. */
+/** Espace de travail de conversation haute performance : fil, actions intelligentes, Copilot RAG et tiroir contexte. */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -25,16 +25,18 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
   const [feedback, setFeedback] = useState<Record<string, string>>({});
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [visitorTyping, setVisitorTyping] = useState(false);
-  /** Abonnement refusé (policies 0010 absentes, jeton expiré) → on recharge. */
   const [realtimeDown, setRealtimeDown] = useState(false);
   const [noteMode, setNoteMode] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDrawer, setShowDrawer] = useState(true);
+
   // Copilot IA
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [copilotBusy, setCopilotBusy] = useState(false);
   const [copilotText, setCopilotText] = useState('');
   const [copilotSources, setCopilotSources] = useState<{ id: string; title: string }[]>([]);
+
   // Brouillon « transformer en article »
   const [articleDraft, setArticleDraft] = useState<{
     title: string;
@@ -42,6 +44,7 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
     tags: string;
     content: string;
   } | null>(null);
+
   const listRef = useRef<HTMLDivElement>(null);
   const typingTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingSent = useRef(0);
@@ -78,12 +81,11 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
       .catch(() => {});
   }, []);
 
-  // Défilement automatique vers le bas à chaque nouveau message.
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, visitorTyping]);
 
-  // Temps réel du canal conversation (canal PRIVÉ — voir migration 0010).
+  // Temps réel conversationnel
   useEffect(() => {
     let ch: ReturnType<typeof supabase.channel> | null = null;
     let disposed = false;
@@ -102,7 +104,7 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
 
       ch = supabase.channel(`conv:${conversationId}`, { config: { private: true } });
       ch.on('broadcast', { event: 'message:new' }, ({ payload }: { payload: Message }) => {
-        if (payload?.internal_note) return; // diffusée uniquement via note:new
+        if (payload?.internal_note) return;
         append(payload);
       })
         .on('broadcast', { event: 'note:new' }, ({ payload }: { payload: Message }) => append(payload))
@@ -124,8 +126,6 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
     };
   }, [supabase, conversationId]);
 
-  // Repli sans temps réel : rechargement périodique du fil. Plus court que
-  // l'intervalle de la liste — ici l'agent attend une réponse en direct.
   useEffect(() => {
     if (!realtimeDown) return;
     const id = setInterval(() => load(), 10000);
@@ -180,23 +180,14 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
       conversation_id: conversationId,
       sender: 'agent',
       agent_id: agent.id,
-      content: payload.contentHtml ? '' : '(pièce jointe)',
-      content_html: payload.contentHtml || null,
+      agent_name: agent.full_name ?? agent.email,
+      content: payload.contentHtml.replace(/<[^>]*>/g, ''),
+      content_html: payload.contentHtml,
       internal_note: noteMode,
       created_at: new Date().toISOString(),
-      agent_name: agent.full_name,
-      attachments: payload.attachments.map((a) => ({
-        id: `tmp-${a.storage_path}`,
-        message_id: tempId,
-        storage_path: a.storage_path,
-        file_name: a.file_name,
-        mime_type: a.mime_type,
-        size_bytes: a.size_bytes,
-        url: null
-      })) as Attachment[]
+      attachments: []
     };
     setMessages((ms) => [...ms, optimistic]);
-    onTyping(false);
 
     const res = await fetch('/api/agent/messages', {
       method: 'POST',
@@ -219,7 +210,7 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
     setSending(false);
   }
 
-  // ── Copilot IA : génère une suggestion de réponse ──────────────────────────
+  // Copilot IA
   async function runCopilot() {
     setCopilotOpen(true);
     setCopilotBusy(true);
@@ -246,9 +237,8 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
     setCopilotOpen(false);
   }
 
-  // ── Transformer un échange en article de la base de connaissances ──────────
+  // Transformer en article
   function openArticleDraft(agentMessage: Message) {
-    // Question du visiteur la plus proche AVANT cette réponse d'agent.
     const idx = messages.findIndex((m) => m.id === agentMessage.id);
     let question = '';
     for (let i = idx - 1; i >= 0; i--) {
@@ -291,11 +281,14 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
 
   if (error && !conv) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <p className="text-sm text-coral-600">{error}</p>
+      <div className="flex flex-1 items-center justify-center p-6">
+        <p className="text-xs font-semibold text-coral-600 bg-coral-50 px-4 py-3 rounded-2xl border border-coral-200">
+          {error}
+        </p>
       </div>
     );
   }
+
   if (!conv) {
     return (
       <div className="flex min-h-0 flex-1 flex-col bg-mist">
@@ -322,52 +315,65 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
   const assignedName = team.find((t) => t.id === conv.assigned_agent_id)?.full_name ?? null;
 
   return (
-    <div className="flex min-h-0 flex-1">
+    <div className="flex min-h-0 flex-1 overflow-hidden">
+      {/* ── Section Centrale : Fil de discussion & Composeur ───────────────── */}
       <section className="flex min-w-0 flex-1 flex-col bg-mist">
-        {/* En-tête conversation — les actions passent sous l'identité quand la
-            largeur ne suffit plus, plutôt que de comprimer les deux. */}
-        <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-mist-300 bg-white px-4 py-3 md:px-5">
-          <div className="flex min-w-0 flex-1 items-center gap-2 md:gap-3">
-            {/* Sous md, la liste et la conversation ne coexistent pas : sans ce
-                retour, la conversation serait un cul-de-sac. */}
+        {/* En-tête de commande haute précision */}
+        <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-mist-300/80 bg-white px-4 py-3 md:px-6 shadow-2xs">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             <Link
               href="/inbox"
-              aria-label="Retour à la liste des conversations"
-              className="-ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-ink-500 transition hover:bg-mist md:hidden"
+              aria-label="Retour"
+              className="-ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-ink-500 transition hover:bg-mist md:hidden"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M15 18l-6-6 6-6" />
               </svg>
             </Link>
-            <Avatar name={visitor?.display_name ?? 'Visiteur'} size={36} />
+
+            <Avatar name={visitor?.display_name ?? 'Visiteur'} size={38} />
+
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="truncate font-semibold">{visitor?.display_name ?? 'Visiteur'}</span>
+                <span className="truncate font-display text-sm font-bold text-ink">
+                  {visitor?.display_name ?? 'Visiteur anonyme'}
+                </span>
                 <StatusBadge status={conv.status} />
               </div>
-              <p className="truncate text-xs text-ink-500">
-                {assignedName ? `Assignée à ${assignedName}` : canTake ? 'Non assignée' : 'En cours'}
-                {conv.escalated_at ? ` · escaladée ${timeAgo(conv.escalated_at)}` : ''}
-              </p>
+
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-ink-400 mt-0.5">
+                <span>
+                  {assignedName ? `Assignée à ${assignedName}` : canTake ? 'Non assignée' : 'En cours'}
+                  {conv.escalated_at ? ` · escaladée ${timeAgo(conv.escalated_at)}` : ''}
+                </span>
+                {(conv.os || conv.browser) && (
+                  <span className="rounded bg-mist-200 px-1.5 py-0.2 text-[10px] text-ink-600 font-mono">
+                    {conv.os} · {conv.browser}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
+
+          {/* Cluster d'actions rapides */}
+          <div className="flex shrink-0 items-center gap-2">
             {canTake && (
               <button
                 onClick={() => doAction('take')}
-                className="rounded-full bg-lagoon-600 px-3.5 py-1.5 text-sm font-semibold text-white transition hover:bg-lagoon-700"
+                className="flex items-center gap-1.5 rounded-xl bg-lagoon-600 px-3.5 py-2 text-xs font-semibold text-white shadow-glow-sm transition hover:bg-lagoon-500"
               >
-                Prendre en charge
+                <span>⚡</span>
+                <span>Prendre en charge</span>
               </button>
             )}
-            {!resolved && (
+
+            {!resolved ? (
               <>
                 <select
                   value=""
                   onChange={(e) => e.target.value && doAction('assign', e.target.value)}
-                  className="h-9 max-w-[150px] rounded-full border border-mist-300 bg-white px-3 text-sm text-ink-600"
-                  title="Assigner à un agent"
-                  aria-label="Assigner à un agent"
+                  className="rounded-xl border border-mist-300 bg-white px-3 py-2 text-xs text-ink-600 outline-none hover:border-lagoon-400 transition"
+                  title="Assigner"
                 >
                   <option value="">Assigner à…</option>
                   {team.map((t) => (
@@ -376,33 +382,59 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
                     </option>
                   ))}
                 </select>
+
                 <button
                   onClick={() => doAction('resolve')}
-                  className="rounded-full border border-mist-300 bg-white px-3.5 py-1.5 text-sm font-medium text-ink transition hover:border-lagoon-300 hover:text-lagoon-700"
+                  className="flex items-center gap-1 rounded-xl border border-mist-300 bg-white px-3 py-2 text-xs font-semibold text-ink transition hover:border-lagoon-300 hover:text-lagoon-700 hover:bg-lagoon-50/50"
                 >
-                  Résoudre
+                  <span>✓</span>
+                  <span>Résoudre</span>
                 </button>
               </>
-            )}
-            {resolved && (
+            ) : (
               <button
                 onClick={() => doAction('reopen')}
-                className="rounded-full border border-mist-300 bg-white px-3.5 py-1.5 text-sm font-medium text-ink transition hover:border-lagoon-300"
+                className="rounded-xl border border-mist-300 bg-white px-3 py-2 text-xs font-semibold text-ink transition hover:border-lagoon-300"
               >
                 Rouvrir
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => setShowDrawer(!showDrawer)}
+              className={cn(
+                'hidden xl:flex h-8 w-8 items-center justify-center rounded-xl border transition',
+                showDrawer
+                  ? 'border-lagoon-300 bg-lagoon-50 text-lagoon-700'
+                  : 'border-mist-300 bg-white text-ink-400 hover:text-ink'
+              )}
+              title="Afficher/Masquer le contexte client"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 16v-4" />
+                <path d="M12 8h.01" />
+              </svg>
+            </button>
           </div>
         </header>
+
         {/* Résumé automatique de prise en charge */}
         {conv.summary && (
-          <div className="border-b border-aurora-300/50 bg-aurora-100/40 px-5 py-2.5">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-lagoon-700">Résumé — prise en charge</p>
-            <p className="mt-0.5 text-[13px] leading-relaxed text-ink-700">{conv.summary}</p>
+          <div className="flex items-start gap-2.5 border-b border-aurora-300/60 bg-gradient-to-r from-aurora-50 to-white px-5 py-2.5">
+            <span className="text-sm">✨</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-lagoon-700">
+                Résumé d&apos;escalade IA
+              </p>
+              <p className="text-xs leading-relaxed text-ink-700 mt-0.5">{conv.summary}</p>
+            </div>
           </div>
         )}
-        {/* Fil de messages */}
-        <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+
+        {/* Fil de discussion */}
+        <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4 space-y-2">
           {messages.map((m, i) => {
             const prev = messages[i - 1];
             const newDay = !prev || formatDay(prev.created_at) !== formatDay(m.created_at);
@@ -413,35 +445,42 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
               </div>
             );
           })}
+
           {messages.length === 0 && (
-            <p className="py-8 text-center text-sm text-ink-400">Aucun message pour le moment.</p>
+            <p className="py-12 text-center text-xs text-ink-400">Aucun message pour le moment.</p>
           )}
+
           {visitorTyping && (
-            <div className="mt-2 flex items-center gap-2 text-xs text-ink-500">
+            <div className="flex items-center gap-2 pt-2 text-xs text-ink-500">
               <TypingDots accent="#0B7A6E" />
-              <span>Le visiteur est en train d’écrire…</span>
+              <span className="italic">Le visiteur est en train d’écrire…</span>
             </div>
           )}
         </div>
-        {/* Copilot IA */}
+
+        {/* Dock d'assistance Copilot IA */}
         {!resolved && (
-          <div className="border-t border-mist-300 bg-gradient-to-b from-mist-50 to-white px-4 py-2.5">
+          <div className="border-t border-mist-300/80 bg-gradient-to-b from-mist-50 to-white px-4 py-2.5">
             {!copilotOpen ? (
-              <button
-                onClick={runCopilot}
-                disabled={copilotBusy}
-                className="inline-flex items-center gap-2 rounded-xl border border-aurora-300 bg-white px-3.5 py-2 text-xs font-semibold text-lagoon-700 shadow-sm transition hover:bg-aurora-100/50 hover:shadow-glow-sm disabled:opacity-50"
-              >
-                <span className="text-sm">✨</span>
-                <span>{copilotBusy ? 'Génération en cours…' : 'Suggérer une réponse Copilot (IA)'}</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={runCopilot}
+                  disabled={copilotBusy}
+                  className="inline-flex items-center gap-2 rounded-xl border border-aurora-300 bg-white px-3.5 py-2 text-xs font-semibold text-lagoon-700 shadow-sm transition hover:bg-aurora-100/50 hover:shadow-glow-sm disabled:opacity-50"
+                >
+                  <span>✨</span>
+                  <span>{copilotBusy ? 'Génération en cours…' : 'Suggérer une réponse Copilot (RAG)'}</span>
+                </button>
+              </div>
             ) : (
               <div className="animate-slide-up rounded-2xl border border-aurora-300/80 bg-white p-4 shadow-glow-sm">
                 <div className="mb-2 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-md bg-aurora-100 text-xs">✨</span>
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-md bg-aurora-100 text-xs">
+                      ✨
+                    </span>
                     <span className="font-display text-xs font-bold uppercase tracking-wider text-lagoon-700">
-                      Copilot Luminae
+                      Copilot Luminae · RAG Mistral
                     </span>
                   </div>
                   <button
@@ -455,21 +494,21 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
                 {copilotBusy ? (
                   <div className="flex items-center gap-2 py-3 text-xs text-ink-500">
                     <TypingDots accent="#0B7A6E" />
-                    <span>L&apos;IA analyse la conversation et interroge la base documentaire…</span>
+                    <span>L&apos;IA analyse la conversation et extrait les articles pertinents…</span>
                   </div>
                 ) : (
                   <>
-                    <p className="whitespace-pre-wrap rounded-xl bg-mist-50 p-3 text-sm leading-relaxed text-ink-800">
+                    <p className="whitespace-pre-wrap rounded-xl bg-mist-50 p-3.5 text-xs leading-relaxed text-ink-800 border border-mist-200">
                       {copilotText}
                     </p>
 
                     {copilotSources.length > 0 && (
                       <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs text-ink-500">
-                        <span className="text-[11px] font-medium text-ink-400">Sources :</span>
+                        <span className="text-[10.5px] font-semibold uppercase text-ink-400">Sources :</span>
                         {copilotSources.map((s) => (
                           <span
                             key={s.id}
-                            className="inline-flex items-center gap-1 rounded-md border border-mist-300 bg-white px-2 py-0.5 text-[11px] text-ink-600 shadow-sm"
+                            className="inline-flex items-center gap-1 rounded-lg border border-mist-300 bg-white px-2 py-0.5 text-[11px] text-ink-700 shadow-2xs font-medium"
                           >
                             📖 {s.title}
                           </span>
@@ -477,17 +516,17 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
                       </div>
                     )}
 
-                    <div className="mt-3 flex items-center gap-2">
+                    <div className="mt-3.5 flex items-center gap-2">
                       <button
                         onClick={insertCopilot}
                         disabled={!copilotText}
-                        className="rounded-xl bg-lagoon-600 px-3.5 py-2 text-xs font-semibold text-white shadow-glow-sm transition hover:bg-lagoon-500 disabled:opacity-40"
+                        className="rounded-xl bg-lagoon-600 px-4 py-2 text-xs font-semibold text-white shadow-glow-sm transition hover:bg-lagoon-500 disabled:opacity-40"
                       >
-                        Insérer dans la réponse &rarr;
+                        Insérer dans l&apos;éditeur &rarr;
                       </button>
                       <button
                         onClick={runCopilot}
-                        className="rounded-xl border border-mist-300 bg-white px-3 py-2 text-xs font-medium text-ink-600 transition hover:bg-mist"
+                        className="rounded-xl border border-mist-300 bg-white px-3.5 py-2 text-xs font-medium text-ink-600 transition hover:bg-mist"
                       >
                         Régénérer
                       </button>
@@ -498,40 +537,49 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
             )}
           </div>
         )}
-        {/* Composeur */}
-        <div className={cn('border-t px-4 py-3', noteMode ? 'border-sun-300 bg-sun-50' : 'border-mist-300 bg-white')}>
+
+        {/* Composeur de message */}
+        <div
+          className={cn(
+            'border-t px-4 py-3 transition-colors',
+            noteMode ? 'border-sun-300 bg-sun-50/70' : 'border-mist-300 bg-white'
+          )}
+        >
           {resolved ? (
-            <div className="flex items-center justify-center gap-3 py-1 text-sm text-ink-500">
-              Conversation résolue.
-              <button onClick={() => doAction('reopen')} className="font-medium text-lagoon-600 hover:underline">
-                Rouvrir pour continuer
+            <div className="flex items-center justify-center gap-3 py-2 text-xs text-ink-500">
+              <span>Conversation résolue.</span>
+              <button
+                onClick={() => doAction('reopen')}
+                className="font-semibold text-lagoon-600 hover:underline"
+              >
+                Rouvrir pour répondre
               </button>
             </div>
           ) : (
             <>
-              <div className="mb-2 flex items-center gap-1">
+              <div className="mb-2 flex items-center gap-1.5">
                 <button
                   onClick={() => setNoteMode(false)}
                   className={cn(
-                    'rounded-full px-3 py-1 text-xs font-medium transition',
-                    !noteMode ? 'bg-ink text-white' : 'text-ink-500 hover:bg-mist'
+                    'rounded-xl px-3 py-1.5 text-xs font-semibold transition',
+                    !noteMode ? 'bg-ink text-white shadow-2xs' : 'text-ink-500 hover:bg-mist'
                   )}
                 >
-                  Réponse
+                  Répondre au client
                 </button>
                 <button
                   onClick={() => setNoteMode(true)}
                   className={cn(
-                    'rounded-full px-3 py-1 text-xs font-medium transition',
-                    // sun-600 et non l'ambre DEFAULT : sous du texte blanc,
-                    // celui-ci ne donnait que 2,0:1.
-                    noteMode ? 'bg-sun-600 text-white' : 'text-ink-500 hover:bg-mist'
+                    'flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-semibold transition',
+                    noteMode ? 'bg-sun-600 text-white shadow-2xs' : 'text-ink-500 hover:bg-mist'
                   )}
                 >
-                  Note interne
+                  <span>🔒</span>
+                  <span>Note interne (équipe)</span>
                 </button>
-                {error && <span className="ml-2 text-xs text-coral-600">{error}</span>}
+                {error && <span className="ml-2 text-xs text-coral-600 font-medium">{error}</span>}
               </div>
+
               <Composer
                 ref={composerRef}
                 conversationId={conversationId}
@@ -546,24 +594,30 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
           )}
         </div>
       </section>
-      {/* Contexte visiteur */}
-      <aside className="hidden w-[260px] shrink-0 flex-col gap-1 border-l border-mist-300 bg-white p-4 xl:flex">
-        <h3 className="mb-2 font-display text-sm font-semibold">Contexte visiteur</h3>
-        <dl className="space-y-1">
-          {visitor && (
-            <>
-              <Info label="Première visite" value={new Date(visitor.first_seen_at).toLocaleDateString('fr-FR')} />
-              <Info label="Dernière visite" value={timeAgo(visitor.last_seen_at)} />
-            </>
-          )}
-          {conv.source_url && <Info label="Page d’origine" value={conv.source_url} />}
-          {conv.os && <Info label="Système" value={conv.os} />}
-          {conv.browser && <Info label="Navigateur" value={conv.browser} />}
-          {conv.device_type && <Info label="Appareil" value={conv.device_type} />}
-          {conv.escalated_at && <Info label="Escaladée" value={timeAgo(conv.escalated_at)} />}
-          {conv.summary && <Info label="Résumé" value={conv.summary} />}
-        </dl>
-      </aside>
+
+      {/* ── Tiroir Latéral Droit : Contexte Client & Intelligence ────────────── */}
+      {showDrawer && (
+        <aside className="hidden w-[280px] shrink-0 flex-col border-l border-mist-300/80 bg-white p-5 xl:flex overflow-y-auto">
+          <div className="flex items-center justify-between pb-3 border-b border-mist-300/60">
+            <h3 className="font-display text-xs font-bold uppercase tracking-wider text-ink">Contexte Visiteur</h3>
+            <span className="h-2 w-2 rounded-full bg-lagoon-500 animate-pulse" title="En ligne" />
+          </div>
+
+          <dl className="mt-4 space-y-3.5">
+            {visitor && (
+              <>
+                <Info label="Première visite" value={new Date(visitor.first_seen_at).toLocaleDateString('fr-FR')} />
+                <Info label="Dernière activité" value={timeAgo(visitor.last_seen_at)} />
+              </>
+            )}
+            {conv.source_url && <Info label="Page d’origine" value={conv.source_url} isLink />}
+            {conv.os && <Info label="Système d'exploitation" value={conv.os} />}
+            {conv.browser && <Info label="Navigateur" value={conv.browser} />}
+            {conv.device_type && <Info label="Type d'appareil" value={conv.device_type} />}
+            {conv.escalated_at && <Info label="Escaladée" value={timeAgo(conv.escalated_at)} />}
+          </dl>
+        </aside>
+      )}
 
       {/* Modale : transformer une réponse en article */}
       {articleDraft && (
@@ -576,63 +630,69 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
             if (e.key === 'Escape') setArticleDraft(null);
           }}
         >
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-panel">
-            <h3 id="article-modal-title" className="font-display text-base font-semibold">Nouvel article de la base de connaissances</h3>
+          <div className="w-full max-w-lg animate-slide-up rounded-2xl bg-white p-6 shadow-panel">
+            <h3 id="article-modal-title" className="font-display text-base font-bold text-ink">
+              Créer un article de connaissances (RAG)
+            </h3>
             <p className="mt-1 text-xs text-ink-500">
-              Vérifiez et ajustez le contenu avant de l’ajouter. Il sera indexé pour le bot.
+              Cet article sera automatiquement vectorisé et utilisé par le bot pour répondre aux questions similaires.
             </p>
+
             <div className="mt-4 space-y-3">
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-ink-600">Titre</span>
+                <span className="mb-1 block text-xs font-medium text-ink-600">Titre de l&apos;article</span>
                 <input
-                  className="w-full rounded-xl border border-mist-300 px-3.5 py-2.5 text-sm outline-none focus:border-lagoon-400"
+                  className="w-full rounded-xl border border-mist-300 px-3.5 py-2.5 text-xs outline-none focus:border-lagoon-400"
                   value={articleDraft.title}
                   onChange={(e) => setArticleDraft({ ...articleDraft, title: e.target.value })}
                 />
               </label>
+
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="mb-1 block text-xs font-medium text-ink-600">Catégorie</span>
                   <input
-                    className="w-full rounded-xl border border-mist-300 px-3.5 py-2.5 text-sm outline-none focus:border-lagoon-400"
+                    className="w-full rounded-xl border border-mist-300 px-3.5 py-2.5 text-xs outline-none focus:border-lagoon-400"
                     value={articleDraft.category}
                     onChange={(e) => setArticleDraft({ ...articleDraft, category: e.target.value })}
                     placeholder="Ex. Facturation"
                   />
                 </label>
                 <label className="block">
-                  <span className="mb-1 block text-xs font-medium text-ink-600">Tags (virgules)</span>
+                  <span className="mb-1 block text-xs font-medium text-ink-600">Tags contextuels</span>
                   <input
-                    className="w-full rounded-xl border border-mist-300 px-3.5 py-2.5 text-sm outline-none focus:border-lagoon-400"
+                    className="w-full rounded-xl border border-mist-300 px-3.5 py-2.5 text-xs outline-none focus:border-lagoon-400"
                     value={articleDraft.tags}
                     onChange={(e) => setArticleDraft({ ...articleDraft, tags: e.target.value })}
-                    placeholder="windows, mobile"
+                    placeholder="windows, safari"
                   />
                 </label>
               </div>
+
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-ink-600">Contenu</span>
+                <span className="mb-1 block text-xs font-medium text-ink-600">Contenu de la solution</span>
                 <textarea
-                  rows={7}
-                  className="w-full resize-y rounded-xl border border-mist-300 px-3.5 py-2.5 text-sm outline-none focus:border-lagoon-400"
+                  rows={6}
+                  className="w-full resize-y rounded-xl border border-mist-300 px-3.5 py-2.5 text-xs leading-relaxed outline-none focus:border-lagoon-400 font-sans"
                   value={articleDraft.content}
                   onChange={(e) => setArticleDraft({ ...articleDraft, content: e.target.value })}
                 />
               </label>
             </div>
-            <div className="mt-5 flex items-center justify-end gap-2">
+
+            <div className="mt-5 flex items-center justify-end gap-2 border-t border-mist-300/60 pt-4">
               <button
                 onClick={() => setArticleDraft(null)}
-                className="rounded-xl border border-mist-300 px-4 py-2 text-sm font-medium text-ink-600 transition hover:bg-mist"
+                className="rounded-xl border border-mist-300 px-4 py-2 text-xs font-semibold text-ink-600 hover:bg-mist"
               >
                 Annuler
               </button>
               <button
                 onClick={saveArticleDraft}
                 disabled={sending || !articleDraft.title.trim() || !articleDraft.content.trim()}
-                className="rounded-xl bg-lagoon-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-lagoon-700 disabled:opacity-40"
+                className="rounded-xl bg-lagoon-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-lagoon-500 disabled:opacity-40 shadow-glow-sm"
               >
-                {sending ? 'Création…' : 'Créer l’article'}
+                {sending ? 'Indexation en cours…' : 'Enregistrer et indexer dans le RAG'}
               </button>
             </div>
           </div>
@@ -642,7 +702,7 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
   );
 }
 
-/** Une ligne de message du fil (visiteur, bot, agent, note interne, système). */
+/** Ligne de message du fil avec identité nette et micro-actions. */
 function MessageRow({
   m,
   feedback,
@@ -653,55 +713,78 @@ function MessageRow({
   onMakeArticle?: (m: Message) => void;
 }) {
   if (m.sender === 'system') {
-    return <p className="my-2 text-center text-xs italic text-ink-400">{m.content}</p>;
+    return (
+      <div className="my-2 flex justify-center">
+        <span className="rounded-full bg-mist-200/80 px-3 py-0.5 text-[11px] font-medium text-ink-500">
+          {m.content}
+        </span>
+      </div>
+    );
   }
+
   const isAgent = m.sender === 'agent' && !m.internal_note;
   const isNote = m.internal_note;
   const isBot = m.sender === 'bot';
+
   return (
-    <div className={cn('flex gap-2 py-1', isAgent ? 'justify-end' : 'justify-start')}>
+    <div className={cn('flex gap-2.5 py-1', isAgent ? 'justify-end' : 'justify-start')}>
       {isBot && (
-        <div className="mt-1">
-          <BotOrb size={26} glow={false} />
+        <div className="mt-0.5 shrink-0">
+          <BotOrb size={28} glow={false} />
         </div>
       )}
-      {isAgent && <Avatar name={m.agent_name ?? 'Agent'} size={26} className="mt-1" />}
+
+      {isAgent && <Avatar name={m.agent_name ?? 'Agent'} size={28} className="mt-0.5 shrink-0" />}
+
       <div
         className={cn(
-          'max-w-[68%] rounded-2xl px-3.5 py-2 text-sm shadow-bubble',
-          isAgent && 'rounded-br-sm bg-lagoon-600 text-white',
-          isNote && 'rounded-br-sm border border-sun-300 bg-sun-50 text-ink',
-          isBot && 'rounded-bl-sm border border-aurora-300/60 bg-aurora-100/60 text-ink',
-          m.sender === 'visitor' && 'rounded-bl-sm border border-mist-300 bg-white text-ink'
+          'group relative max-w-[72%] rounded-2xl p-3.5 text-xs leading-relaxed shadow-bubble',
+          isAgent && 'rounded-br-xs bg-lagoon-600 text-white',
+          isNote && 'rounded-br-xs border border-sun-300/80 bg-sun-50 text-ink shadow-sm',
+          isBot && 'rounded-bl-xs border border-aurora-300/70 bg-white text-ink shadow-2xs',
+          m.sender === 'visitor' && 'rounded-bl-xs border border-mist-300 bg-white text-ink'
         )}
       >
         {isNote && (
-          <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-sun-600">Note interne</p>
+          <div className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-sun-700">
+            <span>🔒</span>
+            <span>Note interne d&apos;équipe</span>
+          </div>
         )}
+
+        {isBot && (
+          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-aurora-600">
+            Assistant RAG Luminae
+          </div>
+        )}
+
         {m.content_html ? (
           <div className="rich-content" dangerouslySetInnerHTML={{ __html: m.content_html }} />
         ) : m.content ? (
           <p className="whitespace-pre-wrap">{m.content}</p>
         ) : null}
+
         {m.attachments && m.attachments.length > 0 && (
           <AttachmentList attachments={m.attachments} light={isAgent && !isNote} />
         )}
+
         <div
           className={cn(
-            'mt-1 flex items-center gap-2 text-[10px]',
-            isAgent && !isNote ? 'text-white/70' : 'text-ink-400'
+            'mt-1.5 flex items-center gap-2 text-[10px]',
+            isAgent && !isNote ? 'text-white/75' : 'text-ink-400'
           )}
         >
           <span>{formatTime(m.created_at)}</span>
-          {isBot && feedback === 'up' && <span>👍 utile</span>}
-          {isBot && feedback === 'down' && <span className="font-medium text-coral-600">👎 à revoir</span>}
+          {isBot && feedback === 'up' && <span className="font-semibold text-lagoon-600">👍 utile</span>}
+          {isBot && feedback === 'down' && <span className="font-semibold text-coral-600">👎 à revoir</span>}
+
           {isAgent && onMakeArticle && (
             <button
               onClick={() => onMakeArticle(m)}
-              className="text-white/80 underline-offset-2 transition hover:text-white hover:underline"
-              title="Créer un article de la base de connaissances à partir de cette réponse"
+              className="ml-auto opacity-0 group-hover:opacity-100 text-white/90 underline-offset-2 transition hover:text-white hover:underline"
+              title="Indexer cette solution dans la base RAG"
             >
-              En faire un article
+              + En faire un article RAG
             </button>
           )}
         </div>
@@ -710,10 +793,9 @@ function MessageRow({
   );
 }
 
-/** Prévisualisation des pièces jointes d'un message (images en vignette, autres en lien). */
 function AttachmentList({ attachments, light }: { attachments: Attachment[]; light: boolean }) {
   return (
-    <div className={cn('mt-1.5 flex flex-wrap gap-1.5', attachments.length > 0 && 'first:mt-0')}>
+    <div className={cn('mt-2 flex flex-wrap gap-1.5', attachments.length > 0 && 'first:mt-0')}>
       {attachments.map((a) => {
         const isImage = (a.mime_type ?? '').startsWith('image/');
         if (isImage && a.url) {
@@ -722,7 +804,7 @@ function AttachmentList({ attachments, light }: { attachments: Attachment[]; lig
               <img
                 src={a.url}
                 alt={a.file_name ?? 'Pièce jointe'}
-                className="max-h-40 max-w-[220px] rounded-lg border border-black/10 object-cover"
+                className="max-h-40 max-w-[220px] rounded-xl border border-black/10 object-cover"
               />
             </a>
           );
@@ -734,7 +816,7 @@ function AttachmentList({ attachments, light }: { attachments: Attachment[]; lig
             target="_blank"
             rel="noopener noreferrer"
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition',
+              'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] transition',
               light ? 'border-white/30 text-white hover:bg-white/10' : 'border-mist-300 text-ink-600 hover:bg-mist'
             )}
           >
@@ -746,12 +828,19 @@ function AttachmentList({ attachments, light }: { attachments: Attachment[]; lig
   );
 }
 
-/** Ligne d'information du panneau contexte. */
-function Info({ label, value }: { label: string; value: string }) {
+function Info({ label, value, isLink }: { label: string; value: string; isLink?: boolean }) {
   return (
-    <div className="mb-2.5">
-      <dt className="text-[11px] font-medium uppercase tracking-wide text-ink-400">{label}</dt>
-      <dd className="mt-0.5 break-words text-[13px] text-ink-700">{value}</dd>
+    <div>
+      <dt className="text-[10px] font-bold uppercase tracking-wider text-ink-400">{label}</dt>
+      <dd className="mt-0.5 break-words text-xs font-medium text-ink-700">
+        {isLink ? (
+          <a href={value} target="_blank" rel="noreferrer" className="text-lagoon-600 hover:underline">
+            {value}
+          </a>
+        ) : (
+          value
+        )}
+      </dd>
     </div>
   );
 }
