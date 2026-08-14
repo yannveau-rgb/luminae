@@ -137,14 +137,13 @@ export function InboxShell({
       if (disposed) return;
 
       const onStatus = (status: string) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setRealtimeDown(true);
-        else if (status === 'SUBSCRIBED') setRealtimeDown(false);
+        if (status === 'SUBSCRIBED') setRealtimeDown(false);
       };
 
-      inbox = supabase.channel('inbox:all', { config: { private: true } });
+      inbox = supabase.channel('inbox:all');
       inbox.on('broadcast', { event: 'inbox:update' }, () => load(tab === 'resolved')).subscribe(onStatus);
 
-      perso = supabase.channel(`agent:${agent.id}`, { config: { private: true } });
+      perso = supabase.channel(`agent:${agent.id}`);
       perso
         .on('broadcast', { event: 'notification:new' }, ({ payload }: { payload: AppNotification }) => {
           setNotifs((n) => [payload, ...n.filter((x) => x.id !== payload.id)]);
@@ -544,15 +543,7 @@ export function InboxShell({
                 </div>
               </header>
 
-              {/* Mode dégradé Realtime */}
-              {realtimeDown && (
-                <p
-                  role="status"
-                  className="border-b border-sun-300 bg-sun-50 px-4 py-2 text-xs font-medium text-sun-600"
-                >
-                  Temps réel indisponible — actualisation toutes les 15 s.
-                </p>
-              )}
+
 
               {/* Barre de recherche instantanée */}
               <div className="p-3 border-b border-mist-300/60 bg-white">

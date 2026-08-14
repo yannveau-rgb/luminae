@@ -266,7 +266,7 @@ export default function WidgetPage() {
       }
       if (disposed) return;
       channel = supabase
-        .channel(`conv:${conversationId}`, { config: { private: true } })
+        .channel(`conv:${conversationId}`)
         .on('broadcast', { event: 'message:new' }, ({ payload }: { payload: any }) => {
           const msg = payload as UiMessage;
           setMessages((prev) => {

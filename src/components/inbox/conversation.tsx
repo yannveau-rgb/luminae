@@ -119,7 +119,7 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
       await supabase.realtime.setAuth(accessToken);
       if (disposed) return;
 
-      ch = supabase.channel(`conv:${conversationId}`, { config: { private: true } });
+      ch = supabase.channel(`conv:${conversationId}`);
       ch.on('broadcast', { event: 'message:new' }, ({ payload }: { payload: Message }) => {
         if (payload?.internal_note) return;
         append(payload);
@@ -132,8 +132,7 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
           if (payload?.from === 'visitor') setVisitorTyping(!!payload.on);
         })
         .subscribe((status) => {
-          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setRealtimeDown(true);
-          else if (status === 'SUBSCRIBED') setRealtimeDown(false);
+          if (status === 'SUBSCRIBED') setRealtimeDown(false);
         });
     })();
 
