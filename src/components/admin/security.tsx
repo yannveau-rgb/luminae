@@ -1,9 +1,11 @@
 'use client';
 
-/** Paramètres de sécurité, domaines autorisés et rétention des données (RGPD / CNIL). */
+/** Paramètres de sécurité, domaines autorisés, rétention et registre des demandes RGPD supervisées. */
 
 import { useEffect, useState } from 'react';
 import { Card, Field, FormNotice, SaveButton, SectionHeader, inputCls } from './parts';
+import { type RgpdRequest } from '@/lib/rgpd-store';
+import { cn, timeAgo } from '@/lib/utils';
 
 export interface SecuritySettings {
   retention_days: number;
@@ -23,7 +25,9 @@ const DEFAULT_SECURITY: SecuritySettings = {
 
 export function SecurityPanel() {
   const [settings, setSettings] = useState<SecuritySettings>(DEFAULT_SECURITY);
+  const [rgpdRequests, setRgpdRequests] = useState<RgpdRequest[]>([]);
   const [busy, setBusy] = useState(false);
+  const [purgingId, setPurgingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
@@ -31,6 +35,13 @@ export function SecurityPanel() {
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('http'))))
       .then((j) => {
         if (j.security) setSettings(j.security);
+      })
+      .catch(() => {});
+
+    fetch('/api/admin/rgpd', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('http'))))
+      .then((j) => {
+        if (Array.isArray(j.requests)) setRgpdRequests(j.requests);
       })
       .catch(() => {});
   }, []);
@@ -52,16 +63,127 @@ export function SecurityPanel() {
     setBusy(false);
   }
 
+  async function executePurge(req: RgpdRequest) {
+    if (!window.confirm(`Confirmer la purge manuelle des données personnelles du visiteur « ${req.visitor_name} » ?`)) {
+      return;
+    }
+    setPurgingId(req.id);
+    try {
+      const res = await fetch('/api/admin/rgpd', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: req.id,
+          visitorId: req.visitor_id,
+          conversationId: req.conversation_id,
+          mode: 'anonymize'
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setNotice({ kind: 'ok', text: data.message ?? 'Données purgées avec succès.' });
+        // Rafraîchir la liste
+        const ref = await fetch('/api/admin/rgpd');
+        const j = await ref.json();
+        if (Array.isArray(j.requests)) setRgpdRequests(j.requests);
+      } else {
+        setNotice({ kind: 'error', text: data.error ?? 'Erreur lors de la purge.' });
+      }
+    } catch {
+      setNotice({ kind: 'error', text: 'Erreur réseau.' });
+    }
+    setPurgingId(null);
+  }
+
   return (
-    <form onSubmit={submit}>
+    <div className="space-y-6">
       <SectionHeader
-        title="Sécurité, Domaines & Rétention RGPD"
-        description="Garantissez la stricte conformité RGPD, contrôlez les domaines autorisés à intégrer votre widget et définissez les politiques de purge automatique."
+        title="Sécurité, Domaines & Conformité RGPD"
+        description="Garantissez la conformité RGPD (Droit à l'oubli supervisé), contrôlez les domaines autorisés et gérez le registre des demandes d'effacement."
       />
 
-      <div className="space-y-5">
-        <Card>
-          <h2 className="mb-4 text-sm font-semibold text-ink">Politique de Rétention & Droit à l&apos;Oubli</h2>
+      <FormNotice kind={notice?.kind ?? 'ok'} text={notice?.text ?? null} />
+
+      {/* ── Registre des demandes RGPD supervisées ─────────────────────────── */}
+      <Card className="p-5">
+        <div className="flex items-center justify-between border-b border-mist-200 pb-3 mb-4">
+          <div>
+            <h2 className="text-sm font-bold text-ink flex items-center gap-2">
+              <span>🔒</span>
+              <span>Registre des Demandes d&apos;Effacement RGPD (Droit à l&apos;Oubli)</span>
+            </h2>
+            <p className="text-[11px] text-ink-500 mt-0.5">
+              Demandes soumises par les visiteurs ayant renseigné leurs coordonnées. Chaque suppression doit être validée manuellement par un conseiller.
+            </p>
+          </div>
+          <span className="rounded-full bg-aurora-100 px-2.5 py-0.5 text-xs font-bold text-lagoon-700">
+            {rgpdRequests.filter((r) => r.status === 'pending').length} en attente
+          </span>
+        </div>
+
+        {rgpdRequests.length === 0 ? (
+          <div className="py-8 text-center text-xs text-ink-400">
+            <span className="text-xl block mb-1">🛡️</span>
+            Aucune demande d&apos;effacement RGPD en attente dans le registre.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-mist-200 text-ink-400 font-semibold uppercase text-[10px]">
+                  <th className="pb-2">Visiteur</th>
+                  <th className="pb-2">Date demande</th>
+                  <th className="pb-2">Statut</th>
+                  <th className="pb-2 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-mist-200">
+                {rgpdRequests.map((r) => (
+                  <tr key={r.id} className="hover:bg-mist-50/50">
+                    <td className="py-3 font-medium text-ink">
+                      <p className="font-bold">{r.visitor_name || 'Visiteur'}</p>
+                      <p className="font-mono text-[10.5px] text-ink-400">{r.visitor_id}</p>
+                    </td>
+                    <td className="py-3 text-ink-500">
+                      {new Date(r.requested_at).toLocaleDateString('fr-FR')} ({timeAgo(r.requested_at)})
+                    </td>
+                    <td className="py-3">
+                      <span
+                        className={cn(
+                          'rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase',
+                          r.status === 'pending'
+                            ? 'bg-sun-100 text-sun-700'
+                            : 'bg-lagoon-100 text-lagoon-700'
+                        )}
+                      >
+                        {r.status === 'pending' ? '⏳ En attente de purge' : `✓ Purgé par ${r.processed_by ?? 'Agent'}`}
+                      </span>
+                    </td>
+                    <td className="py-3 text-right">
+                      {r.status === 'pending' ? (
+                        <button
+                          onClick={() => executePurge(r)}
+                          disabled={purgingId === r.id}
+                          className="rounded-xl bg-coral-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-coral-500 disabled:opacity-50"
+                        >
+                          {purgingId === r.id ? 'Purge en cours…' : '🗑️ Exécuter la purge'}
+                        </button>
+                      ) : (
+                        <span className="text-[11px] text-ink-400 font-medium">Traité</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/* ── Paramètres de politique de rétention & domaines ──────────────────── */}
+      <form onSubmit={submit} className="space-y-5">
+        <Card className="p-5">
+          <h2 className="mb-4 text-sm font-semibold text-ink">Politique de Rétention Automatique</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
               label="Purge automatique des conversations inactives"
@@ -94,7 +216,7 @@ export function SecurityPanel() {
           </div>
         </Card>
 
-        <Card>
+        <Card className="p-5">
           <h2 className="mb-4 text-sm font-semibold text-ink">Contrôle d&apos;Origine & Domaines Autorisés</h2>
           <div className="space-y-4">
             <Field
@@ -139,12 +261,11 @@ export function SecurityPanel() {
             </div>
           </div>
         </Card>
-      </div>
 
-      <div className="mt-5 flex items-center gap-3">
-        <SaveButton busy={busy} />
-        <FormNotice kind={notice?.kind ?? 'ok'} text={notice?.text ?? null} />
-      </div>
-    </form>
+        <div className="flex items-center gap-3">
+          <SaveButton busy={busy} label="Enregistrer les paramètres de sécurité" />
+        </div>
+      </form>
+    </div>
   );
 }

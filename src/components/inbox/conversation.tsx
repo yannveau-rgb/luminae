@@ -347,6 +347,37 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
       .find(Boolean) ||
     null;
 
+  async function handlePurgeRgpd() {
+    if (!visitor) return;
+    if (
+      !window.confirm(
+        `Confirmer la suppression manuelle des données personnelles du visiteur « ${visitor.display_name} » conformément au RGPD ?`
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch('/api/admin/rgpd', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestId: `manual_${visitor.id}`,
+          visitorId: visitor.id,
+          conversationId,
+          mode: 'anonymize'
+        })
+      });
+      if (res.ok) {
+        alert('Données personnelles du visiteur anonymisées avec succès.');
+        load();
+      } else {
+        alert('Erreur lors de la purge RGPD.');
+      }
+    } catch {
+      alert('Erreur de communication.');
+    }
+  }
+
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden">
       {/* ── Section Centrale : Fil de discussion & Composeur ───────────────── */}
@@ -682,6 +713,19 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
               {conv.device_type && <Info label="Type d'appareil" value={conv.device_type} />}
               {conv.escalated_at && <Info label="Escaladée" value={timeAgo(conv.escalated_at)} />}
             </dl>
+
+            {visitor?.display_name && (
+              <div className="pt-2 border-t border-mist-200">
+                <button
+                  onClick={handlePurgeRgpd}
+                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-coral-300 bg-coral-50/60 px-3 py-2 text-xs font-semibold text-coral-600 shadow-sm transition hover:bg-coral-100"
+                  title="Anonymise ou supprime les données nominatives du visiteur"
+                >
+                  <span>🔒</span>
+                  <span>Purger données (RGPD)</span>
+                </button>
+              </div>
+            )}
           </div>
         </aside>
       )}

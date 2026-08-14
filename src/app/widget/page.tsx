@@ -110,8 +110,10 @@ export default function WidgetPage() {
   const [visitorName, setVisitorName] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState('');
   const [nameDismissed, setNameDismissed] = useState(false);
-  const [erasing, setErasing] = useState(false);
   const [soundMuted, setSoundMuted] = useState(false);
+  const [rgpdModalOpen, setRgpdModalOpen] = useState(false);
+  const [rgpdSent, setRgpdSent] = useState(false);
+  const [rgpdBusy, setRgpdBusy] = useState(false);
   const [telephony, setTelephony] = useState<{
     enabled: boolean;
     phone_number: string;
@@ -412,29 +414,28 @@ export default function WidgetPage() {
     }).catch(() => {});
   }
 
-  async function eraseData() {
-    if (erasing) return;
-    if (!window.confirm('Voulez-vous vraiment effacer l’ensemble de vos conversations ? Cette action est irréversible.')) {
-      return;
-    }
-    setErasing(true);
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (accessTokenRef.current) {
-      headers['Authorization'] = `Bearer ${accessTokenRef.current}`;
-    }
+  async function submitRgpdRequest() {
+    if (rgpdBusy) return;
+    setRgpdBusy(true);
     try {
-      await fetch('/api/widget/erase', {
+      const res = await fetch('/api/widget/erase-request', {
         method: 'POST',
-        headers,
-        body: JSON.stringify({ token: tokenRef.current })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: tokenRef.current,
+          conversationId
+        })
       });
-      try {
-        localStorage.removeItem(TOKEN_KEY);
-      } catch {}
-      window.location.reload();
+      const data = await res.json();
+      if (res.ok) {
+        setRgpdSent(true);
+      } else {
+        alert(data.error || 'Erreur lors de la demande.');
+      }
     } catch {
-      setErasing(false);
+      alert('Impossible de contacter le serveur.');
     }
+    setRgpdBusy(false);
   }
 
   const onInput = useCallback(
@@ -874,15 +875,92 @@ export default function WidgetPage() {
               <span aria-hidden> · </span>
             </>
           )}
-          <button
-            type="button"
-            onClick={eraseData}
-            className="underline underline-offset-2 hover:text-ink font-medium"
-          >
-            {erasing ? 'Suppression…' : 'Supprimer mes données'}
-          </button>
+          {visitorName && visitorName.trim().length > 0 ? (
+            <button
+              type="button"
+              onClick={() => {
+                setRgpdSent(false);
+                setRgpdModalOpen(true);
+              }}
+              className="underline underline-offset-2 hover:text-ink font-medium"
+            >
+              Supprimer mes données (RGPD)
+            </button>
+          ) : (
+            <span className="text-[10.5px] text-ink-400">
+              Session anonyme
+            </span>
+          )}
         </p>
       </div>
+
+      {/* ── Modale de Demande d'Effacement RGPD Supervisée ───────────────────── */}
+      {rgpdModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="rgpd-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 backdrop-blur-xs"
+        >
+          <div className="w-full max-w-sm animate-scale-in rounded-2xl bg-white p-5 shadow-panel text-left">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-aurora-100 text-sm">
+                🔒
+              </span>
+              <div>
+                <h3 id="rgpd-title" className="font-display text-sm font-bold text-ink">
+                  Droit à l&apos;effacement (RGPD)
+                </h3>
+                <p className="text-[11px] text-ink-400">Article 17 du RGPD · Droit à l&apos;oubli</p>
+              </div>
+            </div>
+
+            {rgpdSent ? (
+              <div className="mt-4 space-y-3">
+                <div className="rounded-xl border border-lagoon-200 bg-lagoon-50/70 p-3.5 text-xs text-lagoon-700 leading-relaxed">
+                  <p className="font-bold text-ink-900">✓ Demande enregistrée</p>
+                  <p className="mt-1">
+                    Votre demande d&apos;effacement a été transmise à notre équipe. Vos coordonnées personnelles seront purgées manuellement par un conseiller.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRgpdModalOpen(false)}
+                  className="w-full rounded-xl bg-ink py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-ink-800"
+                >
+                  Fermer
+                </button>
+              </div>
+            ) : (
+              <div className="mt-4 space-y-3 text-xs text-ink-600">
+                <p className="leading-relaxed">
+                  Vous avez renseigné vos coordonnées nominatives (<span className="font-bold text-ink">{visitorName}</span>).
+                </p>
+                <p className="leading-relaxed">
+                  En confirmant, votre demande d&apos;effacement sera notifiée à un conseiller afin de procéder à la suppression manuelle de vos données personnelles et coordonnées.
+                </p>
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setRgpdModalOpen(false)}
+                    className="rounded-xl border border-mist-300 px-3.5 py-2 text-xs font-medium text-ink-600 transition hover:bg-mist"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    onClick={submitRgpdRequest}
+                    disabled={rgpdBusy}
+                    className="rounded-xl bg-coral-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-coral-500 disabled:opacity-50"
+                  >
+                    {rgpdBusy ? 'Transmission…' : 'Confirmer la suppression'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </main>
     </div>
   );
