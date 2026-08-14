@@ -1,6 +1,6 @@
 'use client';
 
-/** Coquille du back-office : navigation latérale + sections admin complètes (Freshchat / Intercom style). */
+/** Coquille du back-office : navigation latérale catégorisée + sections admin haute performance. */
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -25,148 +25,187 @@ import { TelephonyPanel } from './telephony';
 import { WebhooksPanel } from './webhooks';
 import { SecurityPanel } from './security';
 
-const TABS = [
-  {
-    key: 'stats',
-    label: 'Statistiques',
-    icon: (
-      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-      </svg>
-    )
-  },
-  {
-    key: 'workflows',
-    label: 'Workflows & Automatisations',
-    icon: (
-      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13 10V3L4 14h7v7l9-11h-7z" />
-      </svg>
-    )
-  },
-  {
-    key: 'bot',
-    label: 'Bot & Identité Lumi',
-    icon: (
-      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-      </svg>
-    )
-  },
-  {
-    key: 'routing',
-    label: 'Routage & Distribution',
-    icon: (
-      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-      </svg>
-    )
-  },
-  {
-    key: 'triggers',
-    label: 'Messages Proactifs',
-    icon: (
-      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-      </svg>
-    )
-  },
-  {
-    key: 'prechat',
-    label: 'Formulaire Pré-Chat',
-    icon: (
-      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    )
-  },
-  {
-    key: 'telephony',
-    label: 'Téléphonie & Quicktalk',
-    icon: (
-      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-      </svg>
-    )
-  },
-  {
-    key: 'kb',
-    label: 'Base de connaissances',
-    icon: (
-      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-      </svg>
-    )
-  },
-  {
-    key: 'canned',
-    label: 'Réponses rapides',
-    icon: (
-      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-      </svg>
-    )
-  },
-  {
-    key: 'hours',
-    label: 'Horaires d’ouverture',
-    icon: (
-      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    )
-  },
-  {
-    key: 'absences',
-    label: 'Absences & Congés',
-    icon: (
-      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-      </svg>
-    )
-  },
-  {
-    key: 'team',
-    label: 'Équipe & Accès',
-    icon: (
-      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-      </svg>
-    )
-  },
-  {
-    key: 'webhooks',
-    label: 'Webhooks & API',
-    icon: (
-      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-      </svg>
-    )
-  },
-  {
-    key: 'security',
-    label: 'Sécurité & RGPD',
-    icon: (
-      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-      </svg>
-    )
-  }
-] as const;
+interface TabItem {
+  key: string;
+  label: string;
+  badge?: string;
+  icon: React.ReactNode;
+}
 
-type TabKey = (typeof TABS)[number]['key'];
+interface TabCategory {
+  title: string;
+  items: TabItem[];
+}
+
+const TAB_CATEGORIES: TabCategory[] = [
+  {
+    title: 'Pilotage & Stats',
+    items: [
+      {
+        key: 'stats',
+        label: 'Statistiques & Intentions',
+        icon: (
+          <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        )
+      }
+    ]
+  },
+  {
+    title: 'Intelligence Artificielle',
+    items: [
+      {
+        key: 'bot',
+        label: 'Identité & Bot Lumi',
+        icon: (
+          <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+          </svg>
+        )
+      },
+      {
+        key: 'workflows',
+        label: 'Workflows & Auto',
+        badge: 'New',
+        icon: (
+          <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        )
+      },
+      {
+        key: 'kb',
+        label: 'Base de connaissances',
+        icon: (
+          <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+        )
+      },
+      {
+        key: 'canned',
+        label: 'Réponses rapides (#)',
+        icon: (
+          <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+          </svg>
+        )
+      }
+    ]
+  },
+  {
+    title: 'Canaux & Visiteurs',
+    items: [
+      {
+        key: 'prechat',
+        label: 'Formulaire Pré-Chat',
+        icon: (
+          <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        )
+      },
+      {
+        key: 'triggers',
+        label: 'Messages Proactifs',
+        icon: (
+          <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+        )
+      },
+      {
+        key: 'telephony',
+        label: 'Téléphonie & Quicktalk',
+        icon: (
+          <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+          </svg>
+        )
+      }
+    ]
+  },
+  {
+    title: 'Équipe & Horaires',
+    items: [
+      {
+        key: 'routing',
+        label: 'Routage & Escalade',
+        icon: (
+          <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+          </svg>
+        )
+      },
+      {
+        key: 'hours',
+        label: 'Horaires d’ouverture',
+        icon: (
+          <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        )
+      },
+      {
+        key: 'absences',
+        label: 'Absences & Congés',
+        icon: (
+          <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        )
+      },
+      {
+        key: 'team',
+        label: 'Équipe & Conseillers',
+        icon: (
+          <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+        )
+      }
+    ]
+  },
+  {
+    title: 'Sécurité & Intégrations',
+    items: [
+      {
+        key: 'security',
+        label: 'Sécurité & RGPD',
+        icon: (
+          <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+        )
+      },
+      {
+        key: 'webhooks',
+        label: 'Webhooks & API',
+        icon: (
+          <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+          </svg>
+        )
+      }
+    ]
+  }
+];
+
+const ALL_TAB_KEYS = TAB_CATEGORIES.flatMap((c) => c.items.map((i) => i.key));
+type TabKey = string;
 
 export function AdminShell({ agent }: { agent: Agent }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = supabaseBrowser();
-  
+
   const queryTab = searchParams?.get('tab') as TabKey | null;
-  const initialTab = queryTab && TABS.some((t) => t.key === queryTab) ? queryTab : 'stats';
+  const initialTab = queryTab && ALL_TAB_KEYS.includes(queryTab) ? queryTab : 'stats';
   const [tab, setTab] = useState<TabKey>(initialTab);
 
   useEffect(() => {
-    if (queryTab && TABS.some((t) => t.key === queryTab)) {
+    if (queryTab && ALL_TAB_KEYS.includes(queryTab)) {
       setTab(queryTab);
     }
   }, [queryTab]);
@@ -182,9 +221,12 @@ export function AdminShell({ agent }: { agent: Agent }) {
     router.refresh();
   }
 
+  const activeCategory = TAB_CATEGORIES.find((c) => c.items.some((i) => i.key === tab));
+  const activeItem = TAB_CATEGORIES.flatMap((c) => c.items).find((i) => i.key === tab);
+
   return (
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-mist md:flex-row">
-      {/* Navigation latérale sombre */}
+      {/* Navigation latérale sombre haut de gamme */}
       <aside className="flex w-full shrink-0 flex-col bg-ink-950 text-white md:w-64 border-r border-white/10">
         <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3.5 md:px-5 md:py-4">
           <Link href="/inbox" className="flex min-w-0 items-center gap-2.5" title="Retour à la boîte de réception">
@@ -213,30 +255,54 @@ export function AdminShell({ agent }: { agent: Agent }) {
           </div>
         </div>
 
-        <nav role="tablist" aria-label="Sections d'administration" className="flex gap-1 overflow-x-auto p-2 md:flex-1 md:flex-col md:overflow-x-visible md:overflow-y-auto md:p-3 space-y-0.5">
-          {TABS.map((t) => {
-            const active = tab === t.key;
-            return (
-              <button
-                key={t.key}
-                role="tab"
-                aria-selected={active}
-                onClick={() => switchTab(t.key)}
-                aria-current={active ? 'page' : undefined}
-                className={cn(
-                  'flex items-center gap-2.5 shrink-0 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-medium transition md:w-full md:py-2 md:text-left',
-                  active
-                    ? 'bg-gradient-to-r from-aurora-500/20 via-lagoon-500/15 to-transparent text-white border-l-2 border-aurora-400 shadow-sm'
-                    : 'text-mist-400 hover:bg-white/5 hover:text-white'
-                )}
-              >
-                <span className={active ? 'text-aurora-400' : 'text-mist-400'}>{t.icon}</span>
-                <span>{t.label}</span>
-              </button>
-            );
-          })}
+        {/* Navigation organisée par catégories */}
+        <nav
+          role="tablist"
+          aria-label="Sections d'administration"
+          className="flex gap-1 overflow-x-auto p-2 md:flex-1 md:flex-col md:overflow-x-visible md:overflow-y-auto md:p-3 space-y-3"
+        >
+          {TAB_CATEGORIES.map((cat) => (
+            <div key={cat.title} className="space-y-1">
+              <p className="hidden md:block px-3 text-[10px] font-bold uppercase tracking-wider text-mist-400/60">
+                {cat.title}
+              </p>
+              <div className="flex md:flex-col gap-0.5">
+                {cat.items.map((t) => {
+                  const active = tab === t.key;
+                  return (
+                    <button
+                      key={t.key}
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => switchTab(t.key)}
+                      aria-current={active ? 'page' : undefined}
+                      className={cn(
+                        'group flex items-center justify-between gap-2.5 shrink-0 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-medium transition md:w-full md:text-left',
+                        active
+                          ? 'bg-gradient-to-r from-aurora-500/20 via-lagoon-500/15 to-transparent text-white border-l-2 border-aurora-400 shadow-sm font-semibold'
+                          : 'text-mist-400 hover:bg-white/5 hover:text-white'
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className={cn('transition', active ? 'text-aurora-400' : 'text-mist-400 group-hover:text-white')}>
+                          {t.icon}
+                        </span>
+                        <span className="truncate">{t.label}</span>
+                      </div>
+                      {t.badge && (
+                        <span className="hidden md:inline rounded bg-aurora-500/20 px-1.5 py-0.2 text-[9.5px] font-bold text-aurora-300">
+                          {t.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
+        {/* Footer Agent & Déconnexion */}
         <div className="hidden border-t border-white/10 p-3.5 md:block bg-ink-950/80">
           <div className="flex items-center gap-2.5">
             <Avatar name={agent.full_name ?? agent.email} url={agent.avatar_url} size={30} />
@@ -262,23 +328,31 @@ export function AdminShell({ agent }: { agent: Agent }) {
         </div>
       </aside>
 
-      {/* Contenu de la section active */}
+      {/* Contenu de la section active avec fil d'ariane moderne */}
       <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+        <div className="border-b border-mist-300/80 bg-white/70 px-6 py-2.5 backdrop-blur-xs hidden md:flex items-center gap-2 text-xs text-ink-500">
+          <span className="text-ink-400">Cockpit Admin</span>
+          <span>&rsaquo;</span>
+          <span className="font-medium text-ink-600">{activeCategory?.title}</span>
+          <span>&rsaquo;</span>
+          <span className="font-bold text-ink">{activeItem?.label}</span>
+        </div>
+
         <div className={cn('mx-auto px-4 py-6 md:px-6 md:py-8', tab === 'stats' ? 'max-w-5xl' : 'max-w-3xl')}>
           {tab === 'stats' && <StatsPanel />}
           {tab === 'workflows' && <WorkflowsPanel />}
           {tab === 'bot' && <BotSettingsForm />}
-          {tab === 'routing' && <RoutingPanel />}
-          {tab === 'triggers' && <TriggersPanel />}
-          {tab === 'prechat' && <PrechatPanel />}
-          {tab === 'telephony' && <TelephonyPanel />}
           {tab === 'kb' && <ArticlesPanel />}
           {tab === 'canned' && <CannedPanel agent={agent} variant="inline" />}
+          {tab === 'prechat' && <PrechatPanel />}
+          {tab === 'triggers' && <TriggersPanel />}
+          {tab === 'telephony' && <TelephonyPanel />}
+          {tab === 'routing' && <RoutingPanel />}
           {tab === 'hours' && <BusinessHoursForm />}
           {tab === 'absences' && <AbsencesPanel />}
           {tab === 'team' && <TeamPanel selfId={agent.id} />}
-          {tab === 'webhooks' && <WebhooksPanel />}
           {tab === 'security' && <SecurityPanel />}
+          {tab === 'webhooks' && <WebhooksPanel />}
         </div>
       </main>
     </div>
