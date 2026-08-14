@@ -671,25 +671,51 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
         </div>
       </section>
 
-      {/* ── Tiroir Latéral Droit : Contexte Client & Intelligence ────────────── */}
+      {/* ── Tiroir Latéral Droit : Contexte Client & Intelligence Haute Définition ────────────── */}
       {showDrawer && (
-        <aside className="hidden w-[280px] shrink-0 flex-col border-l border-mist-300/80 bg-white p-5 xl:flex overflow-y-auto">
-          <div className="flex items-center justify-between pb-3 border-b border-mist-300/60">
-            <h3 className="font-display text-xs font-bold uppercase tracking-wider text-ink">Contexte Visiteur</h3>
-            <span className="h-2 w-2 rounded-full bg-lagoon-500 animate-pulse" title="En ligne" />
+        <aside className="hidden w-[310px] shrink-0 flex-col border-l border-mist-300/80 bg-mist-50/50 p-4 xl:flex overflow-y-auto space-y-3.5">
+          {/* Header du panneau */}
+          <div className="flex items-center justify-between pb-2.5 border-b border-mist-200">
+            <div className="flex items-center gap-2">
+              <span className="font-display text-xs font-bold uppercase tracking-wider text-ink-700">
+                Profil Visiteur
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-lagoon-50 px-2 py-0.5 text-[10px] font-bold text-lagoon-700 border border-lagoon-200">
+                <span className="h-1.5 w-1.5 rounded-full bg-lagoon-500 animate-pulse" />
+                En direct
+              </span>
+            </div>
+            <button
+              onClick={() => setShowDrawer(false)}
+              className="text-ink-400 hover:text-ink text-xs p-1 rounded-lg hover:bg-mist transition"
+              title="Fermer le panneau"
+            >
+              ✕
+            </button>
           </div>
 
-          <div className="mt-4 space-y-4">
+          {/* Carte 1 : Identité Principale */}
+          <div className="rounded-2xl border border-mist-300/80 bg-white p-4 text-center shadow-panel">
+            <div className="mx-auto flex justify-center">
+              <Avatar name={visitor?.display_name ?? 'Visiteur'} size={48} />
+            </div>
+            <h4 className="mt-2.5 font-display text-sm font-bold text-ink truncate">
+              {visitor?.display_name ?? 'Visiteur anonyme'}
+            </h4>
+            <div className="mt-1 flex items-center justify-center gap-1.5">
+              <StatusBadge status={conv.status} />
+            </div>
+
             {detectedPhone && (
-              <div className="rounded-xl border border-lagoon-200 bg-lagoon-50/70 p-3 text-left">
-                <div className="flex items-center justify-between">
-                  <p className="text-[11px] font-bold text-ink-900">Numéro Détecté</p>
-                  <span className="rounded bg-lagoon-100 px-1.5 py-0.2 text-[9.5px] font-bold text-lagoon-700">Quicktalk</span>
+              <div className="mt-3.5 pt-3 border-t border-mist-100">
+                <div className="flex items-center justify-between text-[11px] mb-1">
+                  <span className="text-ink-400 font-medium">Téléphone détecté</span>
+                  <span className="text-[10px] font-bold text-lagoon-700 bg-lagoon-50 px-1.5 py-0.2 rounded">Quicktalk</span>
                 </div>
-                <p className="font-mono text-xs text-ink font-bold mt-1">{detectedPhone}</p>
+                <p className="font-mono text-xs font-bold text-ink">{detectedPhone}</p>
                 <a
                   href={`tel:${detectedPhone.replace(/[\s.-]/g, '')}`}
-                  className="mt-2.5 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-lagoon-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-lagoon-700"
+                  className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl bg-lagoon-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-lagoon-500"
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
@@ -698,34 +724,100 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
                 </a>
               </div>
             )}
+          </div>
 
-            <dl className="space-y-3.5">
+          {/* Carte 2 : Navigation & Contexte en direct */}
+          <div className="rounded-2xl border border-mist-300/80 bg-white p-4 shadow-panel space-y-3">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-ink">
+              <span>🧭</span>
+              <span>Navigation en direct</span>
+            </div>
+
+            {conv.source_url ? (
+              <div className="rounded-xl border border-lagoon-200 bg-lagoon-50/70 p-2.5">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-lagoon-700">
+                  Page consultée
+                </span>
+                <a
+                  href={conv.source_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Ouvrir dans un nouvel onglet"
+                  className="mt-1 flex items-center justify-between gap-1 text-xs font-semibold text-lagoon-700 hover:underline break-all"
+                >
+                  <span className="truncate">{conv.source_url}</span>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" />
+                  </svg>
+                </a>
+              </div>
+            ) : (
+              <p className="text-xs text-ink-400 italic">Aucune page source enregistrée.</p>
+            )}
+
+            <div className="grid grid-cols-2 gap-2 text-xs pt-1">
               {visitor && (
                 <>
-                  <Info label="Première visite" value={new Date(visitor.first_seen_at).toLocaleDateString('fr-FR')} />
-                  <Info label="Dernière activité" value={timeAgo(visitor.last_seen_at)} />
+                  <div className="rounded-xl bg-mist-50 p-2 border border-mist-200">
+                    <span className="block text-[10px] text-ink-400 font-medium">1ère visite</span>
+                    <span className="font-semibold text-ink-800">{new Date(visitor.first_seen_at).toLocaleDateString('fr-FR')}</span>
+                  </div>
+                  <div className="rounded-xl bg-mist-50 p-2 border border-mist-200">
+                    <span className="block text-[10px] text-ink-400 font-medium">Dernier passage</span>
+                    <span className="font-semibold text-ink-800">{timeAgo(visitor.last_seen_at)}</span>
+                  </div>
                 </>
               )}
-              {conv.source_url && <Info label="Page d’origine" value={conv.source_url} isLink />}
-              {conv.os && <Info label="Système d'exploitation" value={conv.os} />}
-              {conv.browser && <Info label="Navigateur" value={conv.browser} />}
-              {conv.device_type && <Info label="Type d'appareil" value={conv.device_type} />}
-              {conv.escalated_at && <Info label="Escaladée" value={timeAgo(conv.escalated_at)} />}
-            </dl>
+            </div>
 
-            {visitor?.display_name && (
-              <div className="pt-2 border-t border-mist-200">
-                <button
-                  onClick={handlePurgeRgpd}
-                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-coral-300 bg-coral-50/60 px-3 py-2 text-xs font-semibold text-coral-600 shadow-sm transition hover:bg-coral-100"
-                  title="Anonymise ou supprime les données nominatives du visiteur"
-                >
-                  <span>🔒</span>
-                  <span>Purger données (RGPD)</span>
-                </button>
+            {conv.escalated_at && (
+              <div className="rounded-xl bg-aurora-100/60 p-2 border border-aurora-300 text-xs">
+                <span className="block text-[10px] text-lagoon-700 font-bold uppercase">Escalade vers agent</span>
+                <span className="font-semibold text-ink-800">Il y a {timeAgo(conv.escalated_at)}</span>
               </div>
             )}
           </div>
+
+          {/* Carte 3 : Environnement Technique */}
+          <div className="rounded-2xl border border-mist-300/80 bg-white p-4 shadow-panel space-y-2.5">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-ink">
+              <span>💻</span>
+              <span>Environnement technique</span>
+            </div>
+
+            <div className="space-y-1.5 text-xs">
+              <div className="flex items-center justify-between py-1 border-b border-mist-100">
+                <span className="text-ink-400">Système</span>
+                <span className="font-mono font-medium text-ink-700">{conv.os ?? 'Non spécifié'}</span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-mist-100">
+                <span className="text-ink-400">Navigateur</span>
+                <span className="font-mono font-medium text-ink-700">{conv.browser ?? 'Web'}</span>
+              </div>
+              <div className="flex items-center justify-between py-1">
+                <span className="text-ink-400">Appareil</span>
+                <span className="font-mono font-medium text-ink-700">{conv.device_type ?? 'Ordinateur'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Carte 4 : Conformité & RGPD */}
+          {visitor?.display_name && (
+            <div className="rounded-2xl border border-mist-300/80 bg-white p-4 shadow-panel">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-ink">Sécurité & RGPD</span>
+                <span className="text-[10px] text-ink-400">Droit à l&apos;oubli</span>
+              </div>
+              <button
+                onClick={handlePurgeRgpd}
+                className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-coral-300 bg-coral-50/70 px-3 py-2 text-xs font-semibold text-coral-600 shadow-sm transition hover:bg-coral-100"
+                title="Anonymise ou supprime les données nominatives du visiteur"
+              >
+                <span>🔒</span>
+                <span>Purger les données (RGPD)</span>
+              </button>
+            </div>
+          )}
         </aside>
       )}
 

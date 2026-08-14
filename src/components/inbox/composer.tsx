@@ -1,9 +1,10 @@
 'use client';
 
 /**
- * Zone de rédaction agent : éditeur riche (gras/italique/listes/liens),
- * insertion de réponses prédéfinies via « / », pièces jointes (bouton + collage
- * Ctrl+V), notes internes. Produit du HTML sanitisé côté serveur.
+ * Zone de rédaction agent haute performance :
+ * Éditeur riche adaptable (auto-extensible + mode grand confort),
+ * insertion rapide de variables/réponses (/), pièces jointes,
+ * notes internes sécurisées, statistiques de frappe et raccourcis.
  */
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
@@ -40,6 +41,12 @@ function resolveVariables(content: string, vars: { contact: string; agent: strin
     .replace(/\{\{\s*agent\s*\}\}/gi, vars.agent);
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Composer(
   { conversationId, visitorName, agentName, noteMode, sending, onSubmit, onTyping },
   ref
@@ -49,6 +56,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [empty, setEmpty] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
   // Réponses prédéfinies
   const [canned, setCanned] = useState<CannedResponse[]>([]);
@@ -62,6 +70,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   const [linkText, setLinkText] = useState('');
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [charCount, setCharCount] = useState(0);
+  const [wordCount, setWordCount] = useState(0);
 
   useEffect(() => {
     fetch('/api/agent/canned', { cache: 'no-store' })
@@ -75,8 +84,6 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
       const el = editorRef.current;
       if (!el) return;
       el.focus();
-      // Si le curseur n'est pas dans l'éditeur (ex. appel depuis le panneau
-      // Copilot sans focus préalable), on place l'insertion en fin de contenu.
       const sel = window.getSelection();
       if (sel && (sel.rangeCount === 0 || !el.contains(sel.getRangeAt(0).startContainer))) {
         const range = document.createRange();
@@ -95,8 +102,11 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
 
   const syncEmpty = useCallback(() => {
     const el = editorRef.current;
-    const len = el?.textContent?.length ?? 0;
+    const text = el?.textContent ?? '';
+    const len = text.length;
+    const words = text.trim() ? text.trim().split(/\s+/).length : 0;
     setCharCount(len);
+    setWordCount(words);
     setEmpty(!el || len === 0);
   }, []);
 
@@ -136,8 +146,6 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
         const before = node.textContent!.slice(0, range.startOffset);
         const m = /\/[a-z0-9_-]*$/i.exec(before);
         if (m) {
-          // On sélectionne réellement le token « /xxx » (pas juste un Range
-          // détaché) pour qu'insertText le remplace de façon atomique et fiable.
           range.setStart(node, range.startOffset - m[0].length);
           sel.removeAllRanges();
           sel.addRange(range);
@@ -224,6 +232,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
     setAttachments([]);
     setEmpty(true);
     setCharCount(0);
+    setWordCount(0);
     setUploadError(null);
     onTyping(false);
   }
@@ -258,13 +267,16 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
 
   return (
     <div className="relative">
-      {/* Picker réponses prédéfinies */}
+      {/* Picker réponses prédéfinies flottant */}
       {pickerOpen && matches.length > 0 && (
-        <div className="absolute bottom-full left-0 mb-2 w-80 overflow-hidden rounded-xl border border-mist-300 bg-white shadow-panel">
-          <p className="border-b border-mist-200 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-ink-400">
-            Réponses rapides
-          </p>
-          <ul>
+        <div className="absolute bottom-full left-0 mb-2 w-88 overflow-hidden rounded-2xl border border-mist-300 bg-white shadow-panel z-30 animate-slide-up">
+          <div className="flex items-center justify-between border-b border-mist-200 px-3.5 py-2 bg-mist-50">
+            <span className="text-[10.5px] font-bold uppercase tracking-wider text-ink-500">
+              ⚡ Réponses rapides disponibles
+            </span>
+            <span className="text-[10px] text-ink-400 font-mono">Entrée ou Tab pour insérer</span>
+          </div>
+          <ul className="divide-y divide-mist-100 max-h-60 overflow-y-auto">
             {matches.map((c, i) => (
               <li key={c.id}>
                 <button
@@ -274,14 +286,17 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
                     pickCanned(c);
                   }}
                   className={cn(
-                    'block w-full px-3 py-2 text-left transition',
-                    i === highlight ? 'bg-lagoon-50' : 'hover:bg-mist'
+                    'block w-full px-3.5 py-2.5 text-left transition',
+                    i === highlight ? 'bg-lagoon-50' : 'hover:bg-mist-50'
                   )}
                 >
-                  <span className="text-sm font-medium">
-                    <span className="text-lagoon-600">/{c.shortcode}</span> · {c.title}
-                  </span>
-                  <span className="mt-0.5 block truncate text-xs text-ink-400">{c.content}</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-ink">
+                      <span className="text-lagoon-600 font-mono">/{c.shortcode}</span> · {c.title}
+                    </span>
+                    <span className="text-[10px] text-ink-400 font-medium">Insérer</span>
+                  </div>
+                  <span className="mt-1 block line-clamp-2 text-xs text-ink-500 leading-relaxed">{c.content}</span>
                 </button>
               </li>
             ))}
@@ -290,8 +305,8 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
       )}
 
       {/* Barre d'outils haute précision */}
-      <div className="mb-2 flex items-center justify-between border-b border-mist-200 pb-1.5">
-        <div className="flex items-center gap-0.5">
+      <div className="mb-2 flex items-center justify-between border-b border-mist-200 pb-2">
+        <div className="flex items-center gap-1">
           <ToolButton label="Gras (Ctrl+B)" onClick={() => exec('bold')}>
             <span className="font-bold text-xs">B</span>
           </ToolButton>
@@ -308,40 +323,58 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
               <line x1="3" y1="18" x2="3.01" y2="18" />
             </svg>
           </ToolButton>
-          <ToolButton label="Insérer un lien" onClick={openLinkModal}>
+          <ToolButton label="Insérer un lien (URL)" onClick={openLinkModal}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
               <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
             </svg>
           </ToolButton>
           <span className="mx-1 h-3.5 w-px bg-mist-300" />
-          <ToolButton label="Joindre un fichier (Images, PDF, Documents)" onClick={() => fileInputRef.current?.click()}>
+          <ToolButton label="Joindre des fichiers (Images, PDF, Documents)" onClick={() => fileInputRef.current?.click()}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
             </svg>
           </ToolButton>
-          {uploading && <span className="ml-1 text-[11px] text-lagoon-600 font-medium animate-pulse">Téléversement…</span>}
+          {uploading && <span className="ml-1 text-[11px] text-lagoon-600 font-semibold animate-pulse">Téléversement en cours…</span>}
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setQuery('');
-            setPickerOpen((o) => !o);
-          }}
-          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-lagoon-700 bg-lagoon-50 hover:bg-lagoon-100 transition"
-          title="Ouvrir les réponses prédéfinies (/)"
-        >
-          <span>⚡</span>
-          <span>Réponses rapides</span>
-          <kbd className="hidden sm:inline rounded bg-white px-1 text-[10px] text-ink-500 border border-mist-300 font-mono shadow-sm">/</kbd>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setExpanded((e) => !e)}
+            className="hidden sm:inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-ink-600 hover:bg-mist transition"
+            title={expanded ? 'Réduire la zone de saisie' : 'Agrandir la zone de saisie pour les longs textes'}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              {expanded ? (
+                <path d="M4 14h6v6m10-10h-6V4m0 6l7-7M4 20l6-6" />
+              ) : (
+                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+              )}
+            </svg>
+            <span>{expanded ? 'Réduire' : 'Agrandir'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setQuery('');
+              setPickerOpen((o) => !o);
+            }}
+            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-bold text-lagoon-700 bg-lagoon-50 hover:bg-lagoon-100 transition border border-lagoon-200"
+            title="Ouvrir les réponses prédéfinies (/)"
+          >
+            <span>⚡</span>
+            <span>Réponses rapides</span>
+            <kbd className="hidden sm:inline rounded bg-white px-1 text-[10px] text-ink-500 border border-mist-300 font-mono shadow-sm">/</kbd>
+          </button>
+        </div>
       </div>
 
       {/* Erreur d'upload éventuelle */}
       {uploadError && (
-        <div className="mb-2 flex items-center justify-between rounded-lg bg-coral-50 px-3 py-1.5 text-xs text-coral-600">
-          <span>{uploadError}</span>
+        <div className="mb-2 flex items-center justify-between rounded-xl bg-coral-50 border border-coral-300 px-3.5 py-2 text-xs text-coral-600">
+          <span>⚠️ {uploadError}</span>
           <button type="button" onClick={() => setUploadError(null)} className="ml-2 font-bold hover:underline">
             ✕
           </button>
@@ -350,27 +383,32 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
 
       {/* Pièces jointes en attente */}
       {attachments.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-1.5">
+        <div className="mb-2.5 flex flex-wrap gap-2">
           {attachments.map((a, i) => (
-            <span
+            <div
               key={a.storage_path}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-mist-300 bg-mist px-2 py-1 text-xs"
+              className="inline-flex items-center gap-2 rounded-xl border border-mist-300 bg-mist-50 px-2.5 py-1.5 text-xs shadow-sm"
             >
-              {a.mime_type.startsWith('image/') ? '🖼️' : '📄'} {a.file_name}
+              <span>{a.mime_type.startsWith('image/') ? '🖼️' : '📄'}</span>
+              <div className="flex flex-col">
+                <span className="font-medium text-ink max-w-[160px] truncate">{a.file_name}</span>
+                <span className="text-[10px] text-ink-400 font-mono">{formatBytes(a.size_bytes)}</span>
+              </div>
               <button
                 type="button"
                 onClick={() => setAttachments((list) => list.filter((_, j) => j !== i))}
-                className="text-ink-400 hover:text-coral-600"
+                className="ml-1 text-ink-400 hover:text-coral-600 text-xs font-bold"
                 aria-label="Retirer"
               >
                 ✕
               </button>
-            </span>
+            </div>
           ))}
         </div>
       )}
 
-      <div className="flex items-end gap-2">
+      {/* Zone de texte principale (Extensible avec grand confort de lecture) */}
+      <div className="flex items-end gap-2.5">
         <div className="relative min-w-0 flex-1">
           <div
             ref={editorRef}
@@ -388,42 +426,59 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             onClick={detectSlash}
             onPaste={onPaste}
             onBlur={() => onTyping(false)}
-            className="rich-content max-h-48 min-h-[46px] w-full overflow-y-auto rounded-xl border border-mist-300 bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-lagoon-300"
+            className={cn(
+              'rich-content w-full overflow-y-auto rounded-2xl border border-mist-300 bg-white p-3.5 text-sm leading-relaxed text-ink outline-none transition focus:border-lagoon-400 focus:ring-2 focus:ring-lagoon-400/20',
+              expanded ? 'min-h-[220px] max-h-[420px]' : 'min-h-[76px] max-h-64'
+            )}
             suppressContentEditableWarning
           />
           {empty && (
-            <span className="pointer-events-none absolute left-3.5 top-2.5 text-sm text-ink-400">
+            <span className="pointer-events-none absolute left-4 top-3.5 text-sm text-ink-400 leading-relaxed">
               {noteMode
-                ? 'Note interne (invisible pour le visiteur)… « / » pour une réponse rapide'
-                : 'Répondre… « / » pour une réponse rapide, Ctrl+V pour coller une image'}
-            </span>
-          )}
-          {charCount >= 3000 && (
-            <span
-              className={cn(
-                'absolute bottom-1 right-2 rounded px-1.5 py-0.5 text-[10px] font-medium',
-                charCount >= 3800 ? 'bg-coral-50 text-coral-600' : 'bg-mist text-ink-500'
-              )}
-            >
-              {charCount}/4000
+                ? 'Rédiger une note interne pour l’équipe… tapez « / » pour insérer un modèle'
+                : 'Rédiger votre réponse au visiteur… tapez « / » pour les réponses rapides, Ctrl+V pour coller une image'}
             </span>
           )}
         </div>
+
+        {/* Bouton d'envoi ergonomique */}
         <button
           onClick={submit}
           disabled={sending}
           className={cn(
-            'h-11 shrink-0 rounded-xl px-4 text-sm font-semibold text-white transition disabled:opacity-40',
-            noteMode ? 'bg-sun-600 hover:bg-sun-700' : 'bg-lagoon-600 hover:bg-lagoon-700'
+            'flex h-12 shrink-0 items-center justify-center gap-2 rounded-2xl px-5 text-sm font-bold text-white shadow-glow-sm transition disabled:opacity-40',
+            noteMode ? 'bg-sun-600 hover:bg-sun-700' : 'bg-lagoon-600 hover:bg-lagoon-500'
           )}
         >
-          {sending ? '…' : noteMode ? 'Noter' : 'Envoyer'}
+          {sending ? (
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+          ) : (
+            <>
+              <span>{noteMode ? '🔒 Noter' : 'Envoyer'}</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+            </>
+          )}
         </button>
       </div>
 
-      <p className="mt-1 text-right text-[10.5px] text-ink-400">
-        Entrée pour envoyer · Maj+Entrée pour saut de ligne
-      </p>
+      {/* Barre de statut et raccourcis en pied d'éditeur */}
+      <div className="mt-2 flex items-center justify-between text-[11px] text-ink-400">
+        <div className="flex items-center gap-2">
+          {charCount > 0 && (
+            <span>
+              {charCount} caractères · {wordCount} mots
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <span><kbd className="rounded bg-mist-100 px-1 py-0.5 font-mono text-[10px] text-ink-600 border border-mist-300">Entrée</kbd> pour envoyer</span>
+          <span>·</span>
+          <span><kbd className="rounded bg-mist-100 px-1 py-0.5 font-mono text-[10px] text-ink-600 border border-mist-300">Maj+Entrée</kbd> saut de ligne</span>
+        </div>
+      </div>
 
       {/* Modale d'insertion de lien accessible */}
       {linkDialogOpen && (
@@ -440,7 +495,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             onSubmit={confirmLink}
             className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-panel"
           >
-            <h3 id="link-dialog-title" className="font-display text-sm font-semibold text-ink">
+            <h3 id="link-dialog-title" className="font-display text-sm font-bold text-ink">
               Insérer un lien hypertexte
             </h3>
             <div className="mt-3 space-y-2.5">
@@ -451,7 +506,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
                   value={linkText}
                   onChange={(e) => setLinkText(e.target.value)}
                   placeholder="Ex. Guide d'utilisation"
-                  className="w-full rounded-lg border border-mist-300 px-3 py-2 text-sm outline-none focus:border-lagoon-400"
+                  className="w-full rounded-xl border border-mist-300 px-3 py-2 text-sm outline-none focus:border-lagoon-400"
                 />
               </label>
               <label className="block">
@@ -463,7 +518,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
                   value={linkUrl}
                   onChange={(e) => setLinkUrl(e.target.value)}
                   placeholder="https://exemple.fr/doc"
-                  className="w-full rounded-lg border border-mist-300 px-3 py-2 text-sm outline-none focus:border-lagoon-400"
+                  className="w-full rounded-xl border border-mist-300 px-3 py-2 text-sm outline-none focus:border-lagoon-400"
                 />
               </label>
             </div>
@@ -471,14 +526,14 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
               <button
                 type="button"
                 onClick={() => setLinkDialogOpen(false)}
-                className="rounded-lg border border-mist-300 px-3 py-1.5 text-xs font-medium text-ink-600 hover:bg-mist"
+                className="rounded-xl border border-mist-300 px-3.5 py-1.5 text-xs font-semibold text-ink-600 hover:bg-mist"
               >
                 Annuler
               </button>
               <button
                 type="submit"
                 disabled={!linkUrl.trim() || !/^https?:\/\//i.test(linkUrl.trim())}
-                className="rounded-lg bg-lagoon-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-lagoon-700 disabled:opacity-40"
+                className="rounded-xl bg-lagoon-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-lagoon-500 disabled:opacity-40 shadow-sm"
               >
                 Insérer le lien
               </button>
@@ -509,7 +564,7 @@ function ToolButton({ label, onClick, children }: { label: string; onClick: () =
       aria-label={label}
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
-      className="flex h-7 min-w-7 items-center justify-center rounded-md px-1.5 text-sm text-ink-600 transition hover:bg-mist"
+      className="flex h-7 min-w-7 items-center justify-center rounded-lg px-1.5 text-sm text-ink-600 transition hover:bg-mist hover:text-ink"
     >
       {children}
     </button>
