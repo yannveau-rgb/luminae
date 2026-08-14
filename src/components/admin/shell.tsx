@@ -416,7 +416,7 @@ export function AdminShell({
 
       {/* Contenu de la section active avec fil d'ariane & bouton de fermeture */}
       <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-mist">
-        <div className="sticky top-0 z-10 border-b border-mist-300/80 bg-white/80 px-6 py-2.5 backdrop-blur-md flex items-center justify-between gap-3 text-xs text-ink-500 shadow-xs">
+        <div className="sticky top-0 z-10 border-b border-mist-300/80 bg-white/80 px-6 py-2.5 backdrop-blur-md flex items-center justify-between gap-3 text-xs text-ink-500 shadow-sm">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCollapsed((c) => !c)}
@@ -439,7 +439,7 @@ export function AdminShell({
           {onClose && (
             <button
               onClick={onClose}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-mist-300 bg-white px-2.5 py-1 text-xs font-semibold text-ink-700 shadow-xs transition hover:bg-mist hover:text-ink"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-mist-300 bg-white px-2.5 py-1 text-xs font-semibold text-ink-700 shadow-sm transition hover:bg-mist hover:text-ink"
             >
               <span>✕</span>
               <span>Fermer</span>
