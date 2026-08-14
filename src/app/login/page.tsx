@@ -30,7 +30,10 @@ function messageErreur(err: { message?: string; status?: number; code?: string }
   if (texte.includes('banned') || texte.includes('suspended')) {
     return 'Ce compte est suspendu. Contactez un administrateur.';
   }
-  return 'E-mail ou mot de passe incorrect.';
+  if (texte.includes('invalid login credentials') || texte.includes('invalid credentials')) {
+    return 'E-mail ou mot de passe incorrect.';
+  }
+  return err.message || 'E-mail ou mot de passe incorrect.';
 }
 
 export default function LoginPage() {
@@ -63,6 +66,7 @@ export default function LoginPage() {
     setError(null);
     const { error: err } = await supabase.auth.signInWithPassword({ email, password });
     if (err) {
+      console.error('[Luminae Auth] signInWithPassword error:', err);
       setError(messageErreur(err));
       setBusy(false);
       return;
@@ -83,6 +87,7 @@ export default function LoginPage() {
     });
     setBusy(false);
     if (err) {
+      console.error('[Luminae Auth] signInWithOtp error:', err);
       setError(messageErreur(err));
       return;
     }
@@ -98,6 +103,7 @@ export default function LoginPage() {
     const { error: err } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: redirectUrl });
     setBusy(false);
     if (err) {
+      console.error('[Luminae Auth] resetPasswordForEmail error:', err);
       setError(messageErreur(err));
       return;
     }
