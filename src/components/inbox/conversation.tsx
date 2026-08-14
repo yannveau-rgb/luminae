@@ -422,7 +422,7 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
 
         {/* Résumé automatique de prise en charge */}
         {conv.summary && (
-          <div className="flex items-start gap-2.5 border-b border-aurora-300/60 bg-gradient-to-r from-aurora-50 to-white px-5 py-2.5">
+          <div className="flex items-start gap-2.5 border-b border-aurora-300/60 bg-gradient-to-r from-aurora-100/50 to-white px-5 py-2.5">
             <span className="text-sm">✨</span>
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-bold uppercase tracking-wider text-lagoon-700">
