@@ -116,8 +116,6 @@ export function InboxShell({
       perso
         .on('broadcast', { event: 'notification:new' }, ({ payload }: { payload: AppNotification }) => {
           setNotifs((n) => [payload, ...n.filter((x) => x.id !== payload.id)]);
-          const alreadyOnConversation = Boolean(payload.conversation_id) && payload.conversation_id === selectedId;
-          if (alreadyOnConversation && document.hasFocus()) return;
           playNotificationSound();
           showBrowserNotification({
             title: payload.title,

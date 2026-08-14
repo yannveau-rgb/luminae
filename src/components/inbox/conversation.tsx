@@ -60,7 +60,17 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
     const j = await res.json();
     setConv(j.conversation);
     setVisitor(j.visitor);
-    setMessages(j.messages ?? []);
+    if (Array.isArray(j.messages)) {
+      setMessages((prev) => {
+        if (prev.length > 0 && j.messages.length > prev.length) {
+          const lastNew = j.messages[j.messages.length - 1];
+          if (lastNew?.sender === 'visitor') {
+            playAgentNotificationSound();
+          }
+        }
+        return j.messages;
+      });
+    }
     setFeedback(j.feedback ?? {});
     if (j.conversation.unread_count > 0) {
       fetch(`/api/agent/conversations/${conversationId}`, {
