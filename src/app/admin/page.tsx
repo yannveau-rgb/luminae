@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { AuthError, requireAgent } from '@/lib/auth';
 import { AdminShell } from '@/components/admin/shell';
@@ -21,5 +22,9 @@ export default async function AdminPage() {
     }
     throw err;
   }
-  return <AdminShell agent={agent} />;
+  return (
+    <Suspense fallback={<div className="flex h-screen items-center justify-center bg-mist text-sm text-ink-400">Chargement…</div>}>
+      <AdminShell agent={agent} />
+    </Suspense>
+  );
 }
