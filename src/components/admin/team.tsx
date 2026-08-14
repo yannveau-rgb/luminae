@@ -156,7 +156,7 @@ export function TeamPanel({ selfId }: { selfId: string }) {
                   <span
                     className={cn(
                       'rounded-full px-2 py-0.5 text-[10px] font-medium',
-                      a.role === 'admin' ? 'bg-aurora-100 text-aurora-700' : 'bg-mist-100 text-ink-600'
+                      a.role === 'admin' ? 'bg-aurora-100 text-aurora-600' : 'bg-mist-100 text-ink-600'
                     )}
                   >
                     {a.role === 'admin' ? 'Admin' : 'Agent'}
@@ -193,7 +193,7 @@ export function TeamPanel({ selfId }: { selfId: string }) {
                     setDeleteError(null);
                     setAgentToDelete(a);
                   }}
-                  className="rounded-lg border border-coral-200 px-2.5 py-1.5 text-xs font-medium text-coral-600 transition hover:bg-coral-50 hover:border-coral-300"
+                  className="rounded-lg border border-coral-300 px-2.5 py-1.5 text-xs font-medium text-coral-600 transition hover:bg-coral-50"
                   title="Supprimer ce membre"
                 >
                   Supprimer
@@ -410,7 +410,7 @@ export function TeamPanel({ selfId }: { selfId: string }) {
                 type="button"
                 onClick={handleDeleteAgent}
                 disabled={deleting}
-                className="rounded-xl bg-coral-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-coral-700 disabled:opacity-50"
+                className="rounded-xl bg-coral-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-coral-500 disabled:opacity-50"
               >
                 {deleting ? 'Suppression…' : 'Confirmer la suppression'}
               </button>
