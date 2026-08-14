@@ -20,7 +20,10 @@
 --  2. Agent — JWT de session Supabase. Accède à `inbox:all`, à toutes les
 --     conversations, et à son seul canal de notifications personnel.
 
-alter table realtime.messages enable row level security;
+-- NB : pas de `alter table realtime.messages enable row level security` ici.
+-- Supabase l'active deja par defaut, et cette table appartient a un role
+-- interne : l'instruction echoue avec « must be owner of table messages » et
+-- fait avorter tout le reste du script. Seules les policies nous incombent.
 
 -- ── 1. Visiteur : uniquement le canal de sa propre conversation ───────────
 drop policy if exists "visiteur recoit sa conversation" on realtime.messages;
