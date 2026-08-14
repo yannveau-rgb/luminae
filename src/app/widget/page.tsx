@@ -411,33 +411,38 @@ export default function WidgetPage() {
 
   if (phase === 'loading') {
     return (
-      <main className="flex h-[100dvh] flex-col items-center justify-center gap-4 bg-gradient-to-b from-white to-mist">
-        <BotOrb size={56} />
-        <p className="font-display text-xs font-semibold text-ink-600">Connexion à Luminae…</p>
-      </main>
+      <div className="flex min-h-[100dvh] w-full items-center justify-center bg-mist-100 p-0 sm:p-4">
+        <main className="flex h-[100dvh] w-full flex-col items-center justify-center gap-4 bg-gradient-to-b from-white to-mist sm:h-[680px] sm:max-w-[420px] sm:rounded-3xl sm:border sm:border-mist-300/80 sm:shadow-2xl">
+          <BotOrb size={56} />
+          <p className="font-display text-xs font-semibold text-ink-600">Connexion à Luminae…</p>
+        </main>
+      </div>
     );
   }
 
   if (phase === 'error') {
     return (
-      <main className="flex h-[100dvh] flex-col items-center justify-center gap-3 bg-gradient-to-b from-white to-mist px-6 text-center">
-        <p className="font-display text-sm font-bold text-ink">L’assistant n’a pas pu être chargé.</p>
-        <p className="text-xs text-ink-500">Vérifiez votre connexion Internet puis réessayez.</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="mt-2 rounded-xl bg-lagoon-600 px-5 py-2.5 text-xs font-semibold text-white shadow-glow-sm transition hover:bg-lagoon-500"
-        >
-          Réessayer
-        </button>
-      </main>
+      <div className="flex min-h-[100dvh] w-full items-center justify-center bg-mist-100 p-0 sm:p-4">
+        <main className="flex h-[100dvh] w-full flex-col items-center justify-center gap-3 bg-gradient-to-b from-white to-mist px-6 text-center sm:h-[680px] sm:max-w-[420px] sm:rounded-3xl sm:border sm:border-mist-300/80 sm:shadow-2xl">
+          <p className="font-display text-sm font-bold text-ink">L’assistant n’a pas pu être chargé.</p>
+          <p className="text-xs text-ink-500">Vérifiez votre connexion Internet puis réessayez.</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-2 rounded-xl bg-lagoon-600 px-5 py-2.5 text-xs font-semibold text-white shadow-glow-sm transition hover:bg-lagoon-500"
+          >
+            Réessayer
+          </button>
+        </main>
+      </div>
     );
   }
 
   return (
-    <main
-      className="flex h-[100dvh] flex-col overflow-hidden bg-gradient-to-b from-white via-mist-50 to-mist font-sans text-ink"
-      style={{ '--accent': accent, '--focus-color': accent } as React.CSSProperties}
-    >
+    <div className="flex min-h-[100dvh] w-full items-center justify-center bg-mist-100 p-0 sm:p-4 md:p-6">
+      <main
+        className="flex h-[100dvh] w-full flex-col overflow-hidden bg-gradient-to-b from-white via-mist-50 to-mist font-sans text-ink sm:h-[700px] sm:max-w-[420px] sm:rounded-3xl sm:border sm:border-mist-300/80 sm:shadow-2xl sm:ring-1 sm:ring-black/5"
+        style={{ '--accent': accent, '--focus-color': accent } as React.CSSProperties}
+      >
       {/* ── En-tête haut de gamme en verre dépoli ────────────────────────────── */}
       <header className="relative z-10 flex shrink-0 items-center justify-between border-b border-mist-300/80 bg-white/90 px-4 py-3.5 backdrop-blur-md shadow-sm">
         <div className="flex min-w-0 items-center gap-3">
@@ -752,6 +757,7 @@ export default function WidgetPage() {
         </p>
       </div>
     </main>
+    </div>
   );
 }
 
