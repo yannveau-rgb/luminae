@@ -1,6 +1,6 @@
 'use client';
 
-/** Coquille du back-office : navigation latérale catégorisée + sections admin haute performance. */
+/** Coquille du back-office : navigation latérale catégorisée, repliable (icônes / étendu) et intégrable dans l'Inbox. */
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -37,7 +37,7 @@ interface TabCategory {
   items: TabItem[];
 }
 
-const TAB_CATEGORIES: TabCategory[] = [
+export const TAB_CATEGORIES: TabCategory[] = [
   {
     title: 'Pilotage & Stats',
     items: [
@@ -195,7 +195,15 @@ const TAB_CATEGORIES: TabCategory[] = [
 const ALL_TAB_KEYS = TAB_CATEGORIES.flatMap((c) => c.items.map((i) => i.key));
 type TabKey = string;
 
-export function AdminShell({ agent }: { agent: Agent }) {
+export function AdminShell({
+  agent,
+  onClose,
+  isDrawer = false
+}: {
+  agent: Agent;
+  onClose?: () => void;
+  isDrawer?: boolean;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = supabaseBrowser();
@@ -203,6 +211,7 @@ export function AdminShell({ agent }: { agent: Agent }) {
   const queryTab = searchParams?.get('tab') as TabKey | null;
   const initialTab = queryTab && ALL_TAB_KEYS.includes(queryTab) ? queryTab : 'stats';
   const [tab, setTab] = useState<TabKey>(initialTab);
+  const [collapsed, setCollapsed] = useState<boolean>(false);
 
   useEffect(() => {
     if (queryTab && ALL_TAB_KEYS.includes(queryTab)) {
@@ -210,9 +219,22 @@ export function AdminShell({ agent }: { agent: Agent }) {
     }
   }, [queryTab]);
 
+  // Raccourci ESC pour fermer le panneau si embedded
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && onClose) {
+        onClose();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   function switchTab(newTab: TabKey) {
     setTab(newTab);
-    router.replace(`/admin?tab=${newTab}`, { scroll: false });
+    if (!isDrawer) {
+      router.replace(`/admin?tab=${newTab}`, { scroll: false });
+    }
   }
 
   async function logout() {
@@ -225,47 +247,92 @@ export function AdminShell({ agent }: { agent: Agent }) {
   const activeItem = TAB_CATEGORIES.flatMap((c) => c.items).find((i) => i.key === tab);
 
   return (
-    <div className="flex h-[100dvh] flex-col overflow-hidden bg-mist md:flex-row">
-      {/* Navigation latérale sombre haut de gamme */}
-      <aside className="flex w-full shrink-0 flex-col bg-ink-950 text-white md:w-64 border-r border-white/10">
-        <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3.5 md:px-5 md:py-4">
-          <Link href="/inbox" className="flex min-w-0 items-center gap-2.5" title="Retour à la boîte de réception">
-            <BotOrb size={28} glow />
-            <div className="flex flex-col">
-              <span className="truncate font-display text-base font-bold tracking-tight text-white">Luminae</span>
-              <span className="text-[10px] font-medium text-aurora-300">Cockpit Admin</span>
-            </div>
-          </Link>
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="rounded-full border border-aurora-500/30 bg-aurora-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-aurora-300">
-              Admin
-            </span>
+    <div className={cn('flex h-full w-full flex-col overflow-hidden bg-mist md:flex-row', isDrawer && 'shadow-2xl')}>
+      {/* Navigation latérale sombre haut de gamme rétractable */}
+      <aside
+        className={cn(
+          'flex shrink-0 flex-col bg-ink-950 text-white transition-all duration-200 border-r border-white/10',
+          collapsed ? 'w-full md:w-16' : 'w-full md:w-64'
+        )}
+      >
+        {/* En-tête : logo + toggle collapse */}
+        <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3.5 py-3 md:py-3.5">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <BotOrb size={26} glow />
+            {!collapsed && (
+              <div className="flex flex-col truncate">
+                <span className="truncate font-display text-sm font-bold tracking-tight text-white">Luminae</span>
+                <span className="text-[10px] font-medium text-aurora-300">Paramétrages</span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1">
+            {/* Bouton Réduire / Développer le menu */}
             <button
-              onClick={logout}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-mist-400 transition hover:bg-white/10 hover:text-white md:hidden"
-              title="Se déconnecter"
-              aria-label="Se déconnecter"
+              onClick={() => setCollapsed((c) => !c)}
+              className="hidden md:flex h-7 w-7 items-center justify-center rounded-lg text-mist-400 transition hover:bg-white/10 hover:text-white"
+              title={collapsed ? 'Développer le menu (Large)' : 'Réduire le menu (Icônes)'}
+              aria-label={collapsed ? 'Développer le menu' : 'Réduire le menu'}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className={cn('transition transform', collapsed ? 'rotate-180' : '')}
+              >
+                <path d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
               </svg>
             </button>
+
+            {onClose ? (
+              <button
+                onClick={onClose}
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-mist-400 transition hover:bg-white/10 hover:text-white"
+                title="Fermer les paramètres (ESC)"
+                aria-label="Fermer les paramètres"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            ) : (
+              <button
+                onClick={logout}
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-mist-400 transition hover:bg-white/10 hover:text-white md:hidden"
+                title="Se déconnecter"
+                aria-label="Se déconnecter"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Navigation organisée par catégories */}
+        {/* Navigation organisée par catégories avec mode compact */}
         <nav
           role="tablist"
           aria-label="Sections d'administration"
-          className="flex gap-1 overflow-x-auto p-2 md:flex-1 md:flex-col md:overflow-x-visible md:overflow-y-auto md:p-3 space-y-3"
+          className={cn(
+            'flex gap-1 overflow-x-auto p-2 md:flex-1 md:flex-col md:overflow-x-visible md:overflow-y-auto space-y-3',
+            collapsed ? 'md:p-2 md:space-y-2' : 'md:p-3'
+          )}
         >
           {TAB_CATEGORIES.map((cat) => (
             <div key={cat.title} className="space-y-1">
-              <p className="hidden md:block px-3 text-[10px] font-bold uppercase tracking-wider text-mist-400/60">
-                {cat.title}
-              </p>
+              {!collapsed && (
+                <p className="hidden md:block px-3 text-[9.5px] font-bold uppercase tracking-wider text-mist-400/60">
+                  {cat.title}
+                </p>
+              )}
               <div className="flex md:flex-col gap-0.5">
                 {cat.items.map((t) => {
                   const active = tab === t.key;
@@ -276,20 +343,24 @@ export function AdminShell({ agent }: { agent: Agent }) {
                       aria-selected={active}
                       onClick={() => switchTab(t.key)}
                       aria-current={active ? 'page' : undefined}
+                      title={collapsed ? t.label : undefined}
                       className={cn(
-                        'group flex items-center justify-between gap-2.5 shrink-0 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-medium transition md:w-full md:text-left',
+                        'group flex items-center shrink-0 whitespace-nowrap rounded-xl text-xs font-medium transition md:w-full md:text-left',
+                        collapsed
+                          ? 'justify-center p-2.5'
+                          : 'justify-between gap-2.5 px-3 py-2',
                         active
                           ? 'bg-gradient-to-r from-aurora-500/20 via-lagoon-500/15 to-transparent text-white border-l-2 border-aurora-400 shadow-sm font-semibold'
                           : 'text-mist-400 hover:bg-white/5 hover:text-white'
                       )}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={cn('flex items-center min-w-0', collapsed ? 'justify-center' : 'gap-2.5')}>
                         <span className={cn('transition', active ? 'text-aurora-400' : 'text-mist-400 group-hover:text-white')}>
                           {t.icon}
                         </span>
-                        <span className="truncate">{t.label}</span>
+                        {!collapsed && <span className="truncate">{t.label}</span>}
                       </div>
-                      {t.badge && (
+                      {!collapsed && t.badge && (
                         <span className="hidden md:inline rounded bg-aurora-500/20 px-1.5 py-0.2 text-[9.5px] font-bold text-aurora-300">
                           {t.badge}
                         </span>
@@ -302,40 +373,78 @@ export function AdminShell({ agent }: { agent: Agent }) {
           ))}
         </nav>
 
-        {/* Footer Agent & Déconnexion */}
-        <div className="hidden border-t border-white/10 p-3.5 md:block bg-ink-950/80">
-          <div className="flex items-center gap-2.5">
-            <Avatar name={agent.full_name ?? agent.email} url={agent.avatar_url} size={30} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold text-white">{agent.full_name ?? agent.email}</p>
-              <Link href="/inbox" className="text-[10.5px] text-aurora-300 hover:underline">
-                &larr; Boîte de réception
-              </Link>
-            </div>
+        {/* Footer Agent & Bouton Retour / Déconnexion */}
+        <div className="hidden border-t border-white/10 p-3 md:block bg-ink-950/80">
+          <div className="flex items-center gap-2">
+            <Avatar name={agent.full_name ?? agent.email} url={agent.avatar_url} size={28} />
+            {!collapsed && (
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-semibold text-white">{agent.full_name ?? agent.email}</p>
+                {onClose ? (
+                  <button onClick={onClose} className="text-[10.5px] text-aurora-300 hover:underline">
+                    &larr; Fermer les paramètres
+                  </button>
+                ) : (
+                  <Link href="/inbox" className="text-[10.5px] text-aurora-300 hover:underline">
+                    &larr; Boîte de réception
+                  </Link>
+                )}
+              </div>
+            )}
             <button
-              onClick={logout}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-mist-400 transition hover:bg-white/10 hover:text-white"
-              title="Se déconnecter"
-              aria-label="Se déconnecter"
+              onClick={onClose ?? logout}
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-mist-400 transition hover:bg-white/10 hover:text-white"
+              title={onClose ? 'Fermer les paramètres' : 'Se déconnecter'}
+              aria-label={onClose ? 'Fermer' : 'Déconnexion'}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
+              {onClose ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+              )}
             </button>
           </div>
         </div>
       </aside>
 
-      {/* Contenu de la section active avec fil d'ariane moderne */}
-      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-        <div className="border-b border-mist-300/80 bg-white/70 px-6 py-2.5 backdrop-blur-xs hidden md:flex items-center gap-2 text-xs text-ink-500">
-          <span className="text-ink-400">Cockpit Admin</span>
-          <span>&rsaquo;</span>
-          <span className="font-medium text-ink-600">{activeCategory?.title}</span>
-          <span>&rsaquo;</span>
-          <span className="font-bold text-ink">{activeItem?.label}</span>
+      {/* Contenu de la section active avec fil d'ariane & bouton de fermeture */}
+      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-mist">
+        <div className="sticky top-0 z-10 border-b border-mist-300/80 bg-white/80 px-6 py-2.5 backdrop-blur-md flex items-center justify-between gap-3 text-xs text-ink-500 shadow-xs">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCollapsed((c) => !c)}
+              className="md:hidden flex h-6 w-6 items-center justify-center rounded text-ink-500 hover:bg-mist"
+              title="Basculer le menu"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
+            <span className="text-ink-400 font-medium">Cockpit Paramétrages</span>
+            <span>&rsaquo;</span>
+            <span className="font-medium text-ink-600">{activeCategory?.title}</span>
+            <span>&rsaquo;</span>
+            <span className="font-bold text-ink">{activeItem?.label}</span>
+          </div>
+
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-mist-300 bg-white px-2.5 py-1 text-xs font-semibold text-ink-700 shadow-xs transition hover:bg-mist hover:text-ink"
+            >
+              <span>✕</span>
+              <span>Fermer</span>
+            </button>
+          )}
         </div>
 
         <div className={cn('mx-auto px-4 py-6 md:px-6 md:py-8', tab === 'stats' ? 'max-w-5xl' : 'max-w-3xl')}>

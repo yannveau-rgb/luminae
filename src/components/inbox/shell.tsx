@@ -11,6 +11,7 @@ import { cn, timeAgo } from '@/lib/utils';
 import type { Agent, ConversationStatus, Notification as AppNotification } from '@/lib/types';
 import { Avatar, StatusBadge, UnreadBadge } from './parts';
 import { CannedPanel } from './canned-panel';
+import { AdminShell } from '@/components/admin/shell';
 import {
   getNotificationPermission,
   notificationSupported,
@@ -53,6 +54,7 @@ export function InboxShell({
   const [notifs, setNotifs] = useState<AppNotification[]>([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [cannedOpen, setCannedOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
   const [browserPermission, setBrowserPermission] = useState<NotificationPermission | null>(null);
   const [realtimeDown, setRealtimeDown] = useState(false);
 
@@ -263,17 +265,20 @@ export function InboxShell({
             </button>
 
             {agent.role === 'admin' && (
-              <Link
-                href="/admin"
-                className="flex h-8 w-8 items-center justify-center rounded-xl text-ink-500 transition hover:bg-mist hover:text-ink"
-                title="Cockpit Administration"
+              <button
+                onClick={() => setAdminOpen((o) => !o)}
+                className={cn(
+                  'flex h-8 w-8 items-center justify-center rounded-xl transition',
+                  adminOpen ? 'bg-ink-950 text-white shadow-sm' : 'text-ink-500 hover:bg-mist hover:text-ink'
+                )}
+                title="Cockpit Paramétrages (Ouvrir / Réduire)"
                 aria-label="Administration"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="3" />
-                  <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51h.01a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v.01a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" />
+                  <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 112.83-2.83l.06-.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51h.01a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v.01a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z" />
                 </svg>
-              </Link>
+              </button>
             )}
 
             {/* Centre de notifications */}
@@ -600,6 +605,20 @@ export function InboxShell({
       </main>
 
       {cannedOpen && <CannedPanel agent={agent} variant="modal" onClose={() => setCannedOpen(false)} />}
+
+      {/* ── Panneau Paramétrages & Cockpit Intégré (Ouvrir / Réduire sur le côté) ─ */}
+      {adminOpen && agent.role === 'admin' && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Cockpit Paramétrages"
+          className="fixed inset-0 z-50 flex bg-ink-950/60 backdrop-blur-xs animate-fade-in"
+        >
+          <div className="flex h-full w-full animate-slide-up flex-col bg-mist overflow-hidden shadow-2xl">
+            <AdminShell agent={agent} onClose={() => setAdminOpen(false)} isDrawer />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
