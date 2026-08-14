@@ -60,7 +60,16 @@ create policy "agent recoit ses canaux"
 -- `match_articles` est en SECURITY INVOKER, donc le RLS de `articles` renvoie
 -- déjà zéro ligne à un appelant anon. On ne veut pas que la protection repose
 -- sur ce seul effet de bord : la fonction n'est appelée que côté serveur.
-revoke execute on function public.match_articles(vector, int) from anon, authenticated;
+-- Retirer a PUBLIC, et pas seulement a anon/authenticated : Postgres accorde
+-- EXECUTE a PUBLIC a la creation d'une fonction, si bien qu'un revoke cible sur
+-- ces deux roles ne retire rien du tout — ils conservent le droit via PUBLIC.
+-- Verifie : avant correction, la cle anon obtenait encore 200 sur
+-- /rest/v1/rpc/match_articles.
+revoke execute on function public.match_articles(vector, int) from public, anon, authenticated;
+
+-- La fonction n'est appelee que par les routes serveur, en cle service role :
+-- il faut donc lui re-accorder explicitement le droit qu'on vient d'oter a tous.
+grant execute on function public.match_articles(vector, int) to service_role;
 
 -- ── 4. Durcissement : search_path figé sur les fonctions SECURITY DEFINER ─
 alter function public.touch_conversation() set search_path = public, pg_temp;
