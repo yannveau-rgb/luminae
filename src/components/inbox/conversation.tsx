@@ -298,8 +298,21 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
   }
   if (!conv) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <p className="text-sm text-ink-400">Chargement…</p>
+      <div className="flex min-h-0 flex-1 flex-col bg-mist">
+        <header className="flex h-14 items-center justify-between border-b border-mist-300 bg-white px-5">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 animate-pulse rounded-full bg-mist-300" />
+            <div className="space-y-1.5">
+              <div className="h-4 w-32 animate-pulse rounded bg-mist-300" />
+              <div className="h-3 w-20 animate-pulse rounded bg-mist-200" />
+            </div>
+          </div>
+        </header>
+        <div className="flex-1 space-y-4 p-5">
+          <div className="h-14 w-2/3 animate-pulse rounded-2xl bg-white" />
+          <div className="ml-auto h-12 w-1/2 animate-pulse rounded-2xl bg-lagoon-100/50" />
+          <div className="h-16 w-3/4 animate-pulse rounded-2xl bg-white" />
+        </div>
       </div>
     );
   }
@@ -405,7 +418,7 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
           )}
           {visitorTyping && (
             <div className="mt-2 flex items-center gap-2 text-xs text-ink-500">
-              <TypingDots accent="#0E8C7D" />
+              <TypingDots accent="#0B7A6E" />
               <span>Le visiteur est en train d’écrire…</span>
             </div>
           )}
@@ -513,25 +526,35 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
       {/* Contexte visiteur */}
       <aside className="hidden w-[260px] shrink-0 flex-col gap-1 border-l border-mist-300 bg-white p-4 xl:flex">
         <h3 className="mb-2 font-display text-sm font-semibold">Contexte visiteur</h3>
-        {visitor && (
-          <>
-            <Info label="Première visite" value={new Date(visitor.first_seen_at).toLocaleDateString('fr-FR')} />
-            <Info label="Dernière visite" value={timeAgo(visitor.last_seen_at)} />
-          </>
-        )}
-        {conv.source_url && <Info label="Page d’origine" value={conv.source_url} />}
-        {conv.os && <Info label="Système" value={conv.os} />}
-        {conv.browser && <Info label="Navigateur" value={conv.browser} />}
-        {conv.device_type && <Info label="Appareil" value={conv.device_type} />}
-        {conv.escalated_at && <Info label="Escaladée" value={timeAgo(conv.escalated_at)} />}
-        {conv.summary && <Info label="Résumé" value={conv.summary} />}
+        <dl className="space-y-1">
+          {visitor && (
+            <>
+              <Info label="Première visite" value={new Date(visitor.first_seen_at).toLocaleDateString('fr-FR')} />
+              <Info label="Dernière visite" value={timeAgo(visitor.last_seen_at)} />
+            </>
+          )}
+          {conv.source_url && <Info label="Page d’origine" value={conv.source_url} />}
+          {conv.os && <Info label="Système" value={conv.os} />}
+          {conv.browser && <Info label="Navigateur" value={conv.browser} />}
+          {conv.device_type && <Info label="Appareil" value={conv.device_type} />}
+          {conv.escalated_at && <Info label="Escaladée" value={timeAgo(conv.escalated_at)} />}
+          {conv.summary && <Info label="Résumé" value={conv.summary} />}
+        </dl>
       </aside>
 
       {/* Modale : transformer une réponse en article */}
       {articleDraft && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="article-modal-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setArticleDraft(null);
+          }}
+        >
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-panel">
-            <h3 className="font-display text-base font-semibold">Nouvel article de la base de connaissances</h3>
+            <h3 id="article-modal-title" className="font-display text-base font-semibold">Nouvel article de la base de connaissances</h3>
             <p className="mt-1 text-xs text-ink-500">
               Vérifiez et ajustez le contenu avant de l’ajouter. Il sera indexé pour le bot.
             </p>

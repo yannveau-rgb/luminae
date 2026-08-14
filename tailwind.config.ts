@@ -19,9 +19,15 @@ import type { Config } from 'tailwindcss';
  * l'administration (bot_settings.accent_color) — jamais dupliquées ici.
  */
 const config: Config = {
+  darkMode: 'class',
   content: ['./src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      fontSize: {
+        '2xs': ['0.6875rem', { lineHeight: '0.875rem' }],
+        'xs-tight': ['0.75rem', { lineHeight: '1rem' }],
+        'sm-plus': ['0.9375rem', { lineHeight: '1.375rem' }]
+      },
       colors: {
         ink: {
           DEFAULT: '#0F2233',

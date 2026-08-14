@@ -3,19 +3,30 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { signAttachments } from '@/lib/storage';
 import { enforce, WIDGET_RULES } from '@/lib/rate-limit';
-import { tryMintVisitorToken } from '@/lib/visitor-token';
 import { isUuid } from '@/lib/utils';
 import type { Attachment, WidgetSettings } from '@/lib/types';
 
+/** Extrait et valide l'identifiant de session anonyme Supabase éventuel. */
+async function extractAuthUserId(req: Request): Promise<string | null> {
+  const authHeader = req.headers.get('authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  const jwt = authHeader.slice(7).trim();
+  if (!jwt) return null;
+  const db = supabaseAdmin();
+  const { data: { user }, error } = await db.auth.getUser(jwt);
+  if (error || !user) return null;
+  return user.id;
+}
+
 /**
  * POST /api/widget/session
- * Ouvre (ou reprend) la session visiteur : crée le visiteur si besoin,
- * retourne les réglages publics du bot + la conversation active éventuelle,
- * ainsi que le jeton Realtime qui autorise l'abonnement au canal privé de
- * cette conversation (et d'elle seule).
+ * Ouvre (ou reprend) la session visiteur : crée ou associe le visiteur,
+ * retourne les réglages publics du bot + la conversation active éventuelle.
+ * L'abonnement Realtime s'appuie sur la session anonyme Supabase (S-05).
  */
 export async function POST(req: Request) {
   try {
+    const authUserId = await extractAuthUserId(req);
     const body = await req.json().catch(() => ({}));
     const { token } = body;
     if (!isUuid(token)) {
@@ -28,12 +39,13 @@ export async function POST(req: Request) {
     const db = supabaseAdmin();
 
     // Visiteur (création ou dernier accès).
-    // upsert idempotent sur `token` : évite la race condition « duplicate key »
-    // quand deux requêtes /session partent en même temps (double montage React en dev,
-    // onglets multiples). `ignoreDuplicates: false` met aussi à jour last_seen_at.
+    // upsert idempotent sur `token` : associe également auth_user_id si disponible.
+    const visitorPayload: Record<string, any> = { token, last_seen_at: new Date().toISOString() };
+    if (authUserId) visitorPayload.auth_user_id = authUserId;
+
     let { data: visitor, error: upsertErr } = await db
       .from('visitors')
-      .upsert({ token, last_seen_at: new Date().toISOString() }, { onConflict: 'token' })
+      .upsert(visitorPayload, { onConflict: 'token' })
       .select('*')
       .single();
     if (upsertErr) console.error('[widget/session] upsert error', upsertErr);
@@ -42,6 +54,10 @@ export async function POST(req: Request) {
       const { data: existing, error: selectErr } = await db.from('visitors').select('*').eq('token', token).maybeSingle();
       if (selectErr) console.error('[widget/session] select error', selectErr);
       visitor = existing;
+      if (visitor && authUserId && !visitor.auth_user_id) {
+        await db.from('visitors').update({ auth_user_id: authUserId }).eq('id', visitor.id);
+        visitor.auth_user_id = authUserId;
+      }
     }
     if (!visitor) {
       return NextResponse.json({ error: 'Visiteur introuvable.' }, { status: 500 });
@@ -110,7 +126,6 @@ export async function POST(req: Request) {
     // d'envoyer son premier message (sinon il raterait la réponse du bot), sans
     // que le client ait à choisir lui-même une clé primaire.
     const conversationId = active?.id ?? randomUUID();
-    const realtime = tryMintVisitorToken({ visitorId: visitor.id, conversationId });
 
     return NextResponse.json({
       visitorId: visitor.id,
@@ -119,8 +134,7 @@ export async function POST(req: Request) {
       conversation: active,
       messages,
       feedback,
-      conversationId,
-      realtimeToken: realtime?.token ?? null
+      conversationId
     });
   } catch (err: any) {
     console.error('[widget/session]', err);

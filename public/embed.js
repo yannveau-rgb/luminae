@@ -24,7 +24,7 @@
     (script && script.src ? new URL(script.src).origin : window.location.origin);
   base = base.replace(/\/+$/, ''); // sans slash final
 
-  var accent = (script && script.getAttribute('data-accent')) || '#0E8C7D';
+  var accent = (script && script.getAttribute('data-accent')) || '#0B7A6E';
   var isOpen = false;
 
   // ── Styles (portée limitée via id dédiés, z-index élevé) ──────────────────

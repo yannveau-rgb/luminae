@@ -56,6 +56,13 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState(0);
 
+  // Liens et uploads
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [linkText, setLinkText] = useState('');
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [charCount, setCharCount] = useState(0);
+
   useEffect(() => {
     fetch('/api/agent/canned', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
@@ -88,7 +95,9 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
 
   const syncEmpty = useCallback(() => {
     const el = editorRef.current;
-    setEmpty(!el || el.textContent!.trim().length === 0);
+    const len = el?.textContent?.length ?? 0;
+    setCharCount(len);
+    setEmpty(!el || len === 0);
   }, []);
 
   // Filtre des réponses prédéfinies sur le raccourci ou le titre.
@@ -147,15 +156,35 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
     document.execCommand(cmd, false, value);
   }
 
-  function addLink() {
-    const url = window.prompt('URL du lien (https://…)');
-    if (url && /^https?:\/\//i.test(url)) exec('createLink', url);
+  function openLinkModal() {
+    const sel = window.getSelection();
+    const selected = sel ? sel.toString() : '';
+    setLinkText(selected);
+    setLinkUrl('');
+    setLinkDialogOpen(true);
+  }
+
+  function confirmLink(e: React.FormEvent) {
+    e.preventDefault();
+    const cleanUrl = linkUrl.trim();
+    if (!cleanUrl || !/^https?:\/\//i.test(cleanUrl)) return;
+    editorRef.current?.focus();
+    if (linkText.trim()) {
+      document.execCommand('insertHTML', false, `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer">${linkText.trim()}</a>`);
+    } else {
+      exec('createLink', cleanUrl);
+    }
+    setLinkDialogOpen(false);
+    setLinkUrl('');
+    setLinkText('');
+    syncEmpty();
   }
 
   async function uploadFiles(files: FileList | File[]) {
     const list = Array.from(files);
     if (list.length === 0) return;
     setUploading(true);
+    setUploadError(null);
     for (const file of list) {
       const fd = new FormData();
       fd.append('file', file);
@@ -163,9 +192,13 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
       try {
         const res = await fetch('/api/agent/attachments', { method: 'POST', body: fd });
         const j = await res.json();
-        if (res.ok && j.attachment) setAttachments((a) => [...a, j.attachment]);
+        if (res.ok && j.attachment) {
+          setAttachments((a) => [...a, j.attachment]);
+        } else {
+          setUploadError(j.error ?? `Échec de l'envoi de ${file.name}`);
+        }
       } catch {
-        /* ignore */
+        setUploadError(`Erreur réseau lors de l'envoi de ${file.name}`);
       }
     }
     setUploading(false);
@@ -190,6 +223,8 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
     if (el) el.innerHTML = '';
     setAttachments([]);
     setEmpty(true);
+    setCharCount(0);
+    setUploadError(null);
     onTyping(false);
   }
 
@@ -265,7 +300,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
         <ToolButton label="Liste à puces" onClick={() => exec('insertUnorderedList')}>
           ▤
         </ToolButton>
-        <ToolButton label="Lien" onClick={addLink}>
+        <ToolButton label="Lien" onClick={openLinkModal}>
           🔗
         </ToolButton>
         <span className="mx-1 h-4 w-px bg-mist-300" />
@@ -274,6 +309,16 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
         </ToolButton>
         {uploading && <span className="ml-1 text-[11px] text-ink-400">Téléversement…</span>}
       </div>
+
+      {/* Erreur d'upload éventuelle */}
+      {uploadError && (
+        <div className="mb-2 flex items-center justify-between rounded-lg bg-coral-50 px-3 py-1.5 text-xs text-coral-600">
+          <span>{uploadError}</span>
+          <button type="button" onClick={() => setUploadError(null)} className="ml-2 font-bold hover:underline">
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Pièces jointes en attente */}
       {attachments.length > 0 && (
@@ -325,6 +370,16 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
                 : 'Répondre… « / » pour une réponse rapide, Ctrl+V pour coller une image'}
             </span>
           )}
+          {charCount >= 3000 && (
+            <span
+              className={cn(
+                'absolute bottom-1 right-2 rounded px-1.5 py-0.5 text-[10px] font-medium',
+                charCount >= 3800 ? 'bg-coral-50 text-coral-600' : 'bg-mist text-ink-500'
+              )}
+            >
+              {charCount}/4000
+            </span>
+          )}
         </div>
         <button
           onClick={submit}
@@ -337,6 +392,72 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
           {sending ? '…' : noteMode ? 'Noter' : 'Envoyer'}
         </button>
       </div>
+
+      <p className="mt-1 text-right text-[10.5px] text-ink-400">
+        Entrée pour envoyer · Maj+Entrée pour saut de ligne
+      </p>
+
+      {/* Modale d'insertion de lien accessible */}
+      {linkDialogOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="link-dialog-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setLinkDialogOpen(false);
+          }}
+        >
+          <form
+            onSubmit={confirmLink}
+            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-panel"
+          >
+            <h3 id="link-dialog-title" className="font-display text-sm font-semibold text-ink">
+              Insérer un lien hypertexte
+            </h3>
+            <div className="mt-3 space-y-2.5">
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-ink-600">Texte affiché</span>
+                <input
+                  type="text"
+                  value={linkText}
+                  onChange={(e) => setLinkText(e.target.value)}
+                  placeholder="Ex. Guide d'utilisation"
+                  className="w-full rounded-lg border border-mist-300 px-3 py-2 text-sm outline-none focus:border-lagoon-400"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-ink-600">URL cible (https://…)</span>
+                <input
+                  type="url"
+                  required
+                  autoFocus
+                  value={linkUrl}
+                  onChange={(e) => setLinkUrl(e.target.value)}
+                  placeholder="https://exemple.fr/doc"
+                  className="w-full rounded-lg border border-mist-300 px-3 py-2 text-sm outline-none focus:border-lagoon-400"
+                />
+              </label>
+            </div>
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setLinkDialogOpen(false)}
+                className="rounded-lg border border-mist-300 px-3 py-1.5 text-xs font-medium text-ink-600 hover:bg-mist"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={!linkUrl.trim() || !/^https?:\/\//i.test(linkUrl.trim())}
+                className="rounded-lg bg-lagoon-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-lagoon-700 disabled:opacity-40"
+              >
+                Insérer le lien
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       <input
         ref={fileInputRef}

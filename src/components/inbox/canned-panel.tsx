@@ -280,11 +280,23 @@ export function CannedPanel({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-end bg-ink/40 p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="canned-modal-title"
+      className="fixed inset-0 z-50 flex items-start justify-end bg-ink/40 p-4"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose?.();
+      }}
+    >
       <div className="flex h-full w-full max-w-md flex-col overflow-hidden rounded-2xl bg-mist shadow-panel">
         <div className="flex items-center justify-between border-b border-mist-300 bg-white px-5 py-4">
-          <h3 className="font-display text-base font-semibold">Réponses rapides</h3>
-          <button onClick={onClose} className="rounded-full p-1.5 text-ink-400 transition hover:bg-mist hover:text-ink">
+          <h3 id="canned-modal-title" className="font-display text-base font-semibold">Réponses rapides</h3>
+          <button
+            onClick={onClose}
+            aria-label="Fermer"
+            className="rounded-full p-1.5 text-ink-400 transition hover:bg-mist hover:text-ink"
+          >
             ✕
           </button>
         </div>

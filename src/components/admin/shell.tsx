@@ -2,9 +2,9 @@
 
 /** Coquille du back-office : navigation latérale + sections admin. */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { BotOrb } from '@/components/widget/parts';
 import { Avatar } from '@/components/inbox/parts';
@@ -32,8 +32,23 @@ type TabKey = (typeof TABS)[number]['key'];
 
 export function AdminShell({ agent }: { agent: Agent }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = supabaseBrowser();
-  const [tab, setTab] = useState<TabKey>('stats');
+  
+  const queryTab = searchParams?.get('tab') as TabKey | null;
+  const initialTab = queryTab && TABS.some((t) => t.key === queryTab) ? queryTab : 'stats';
+  const [tab, setTab] = useState<TabKey>(initialTab);
+
+  useEffect(() => {
+    if (queryTab && TABS.some((t) => t.key === queryTab)) {
+      setTab(queryTab);
+    }
+  }, [queryTab]);
+
+  function switchTab(newTab: TabKey) {
+    setTab(newTab);
+    router.replace(`/admin?tab=${newTab}`, { scroll: false });
+  }
 
   async function logout() {
     await supabase.auth.signOut();
@@ -75,11 +90,13 @@ export function AdminShell({ agent }: { agent: Agent }) {
           </div>
         </div>
 
-        <nav className="flex gap-1 overflow-x-auto p-2 md:flex-1 md:flex-col md:overflow-x-visible md:overflow-y-auto md:p-3">
+        <nav role="tablist" aria-label="Sections d'administration" className="flex gap-1 overflow-x-auto p-2 md:flex-1 md:flex-col md:overflow-x-visible md:overflow-y-auto md:p-3">
           {TABS.map((t) => (
             <button
               key={t.key}
-              onClick={() => setTab(t.key)}
+              role="tab"
+              aria-selected={tab === t.key}
+              onClick={() => switchTab(t.key)}
               aria-current={tab === t.key ? 'page' : undefined}
               className={cn(
                 'shrink-0 whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-medium transition md:w-full md:py-2.5 md:text-left',

@@ -107,7 +107,7 @@ export async function purgeExpired(): Promise<PurgeReport> {
   // Visiteurs sans aucune conversation et inactifs depuis longtemps.
   const { data: candidats } = await db
     .from('visitors')
-    .select('id')
+    .select('id, auth_user_id')
     .lt('last_seen_at', moisAvant(ORPHAN_VISITOR_MONTHS));
 
   let visiteursSupprimes = 0;
@@ -118,6 +118,9 @@ export async function purgeExpired(): Promise<PurgeReport> {
       .eq('visitor_id', v.id);
     if ((count ?? 0) === 0) {
       await db.from('visitors').delete().eq('id', v.id);
+      if (v.auth_user_id) {
+        await db.auth.admin.deleteUser(v.auth_user_id).catch(() => {});
+      }
       visiteursSupprimes++;
     }
   }
@@ -171,7 +174,11 @@ export async function purgeOrphanFiles(): Promise<number> {
 export async function eraseVisitor(token: string): Promise<PurgeReport | null> {
   const db = supabaseAdmin();
 
-  const { data: visitor } = await db.from('visitors').select('id').eq('token', token).maybeSingle();
+  const { data: visitor } = await db
+    .from('visitors')
+    .select('id, auth_user_id')
+    .eq('token', token)
+    .maybeSingle();
   if (!visitor) return null;
 
   const { data: convs } = await db.from('conversations').select('id').eq('visitor_id', visitor.id);
@@ -183,6 +190,10 @@ export async function eraseVisitor(token: string): Promise<PurgeReport | null> {
   // La suppression du visiteur emporte ses conversations en cascade
   // (`on delete cascade` sur `conversations.visitor_id`), et de là les messages.
   await db.from('visitors').delete().eq('id', visitor.id);
+
+  if (visitor.auth_user_id) {
+    await db.auth.admin.deleteUser(visitor.auth_user_id).catch(() => {});
+  }
 
   return { conversations: ids.length, visiteurs: 1, fichiers: chemins.length, orphelins: 0 };
 }

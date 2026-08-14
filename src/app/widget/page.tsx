@@ -147,10 +147,23 @@ export default function WidgetPage() {
       const url = await detectPageUrl();
       const device = parseUserAgent(navigator.userAgent);
       contextRef.current = { url, os: device.os, browser: device.browser, device_type: device.device_type };
+
+      const supabase = supabaseBrowser();
+      let session = (await supabase.auth.getSession()).data.session;
+      if (!session) {
+        const { data } = await supabase.auth.signInAnonymously().catch(() => ({ data: { session: null } }));
+        session = data?.session ?? null;
+      }
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
       try {
         const res = await fetch('/api/widget/session', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ token: tokenRef.current, context: contextRef.current })
         });
         const data = await res.json();
@@ -163,7 +176,6 @@ export default function WidgetPage() {
         // en cours, ou un identifiant pré-alloué pour la prochaine. On peut donc
         // s'abonner avant le premier message sans choisir soi-même une clé.
         if (data.conversationId) setConversationId(data.conversationId);
-        setRealtimeToken(data.realtimeToken ?? null);
         setVisitorName(data.visitorName ?? null);
         if (data.conversation) {
           setConversationStarted(true);
@@ -181,16 +193,20 @@ export default function WidgetPage() {
 
   // ── Temps réel : nouveaux messages, saisie, statut ─────────────────────
   // Canal PRIVÉ : Realtime vérifie l'abonnement contre les policies de
-  // `realtime.messages` (migration 0010). Le jeton présenté ici ne donne accès
-  // qu'au canal de cette conversation — la clé anon seule n'ouvre plus rien.
+  // `realtime.messages` (migration 0014). La session anonyme Supabase
+  // fournit auth.uid() vérifié par la policy sans clé symétrique partagée.
   useEffect(() => {
-    if (!conversationId || !realtimeToken) return;
+    if (!conversationId) return;
     const supabase = supabaseBrowser();
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let disposed = false;
 
     (async () => {
-      await supabase.realtime.setAuth(realtimeToken);
+      const { data } = await supabase.auth.getSession();
+      const accessToken = data.session?.access_token;
+      if (accessToken) {
+        await supabase.realtime.setAuth(accessToken);
+      }
       if (disposed) return;
       channel = supabase
         .channel(`conv:${conversationId}`, { config: { private: true } })
@@ -226,7 +242,7 @@ export default function WidgetPage() {
       disposed = true;
       if (channel) supabase.removeChannel(channel);
     };
-  }, [conversationId, realtimeToken, scrollBottom]);
+  }, [conversationId, scrollBottom]);
 
   useEffect(() => {
     if (phase === 'ready') scrollBottom();
@@ -239,9 +255,6 @@ export default function WidgetPage() {
       if (!text || sending) return;
       setSending(true);
       setInput('');
-      // L'identifiant vient de /api/widget/session, qui l'a pré-alloué et nous a
-      // délivré le jeton du canal correspondant : on est déjà abonné, la première
-      // réponse du bot ne peut plus être ratée.
       const convId = conversationId;
       const temp: UiMessage = {
         id: `temp-${Date.now()}`,
@@ -253,9 +266,15 @@ export default function WidgetPage() {
       setMessages((prev) => [...prev, temp]);
       scrollBottom();
       try {
+        const supabase = supabaseBrowser();
+        const { data: authData } = await supabase.auth.getSession();
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (authData.session?.access_token) {
+          headers['Authorization'] = `Bearer ${authData.session.access_token}`;
+        }
         const res = await fetch('/api/widget/messages', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             token: tokenRef.current,
             conversationId: convId,
@@ -266,38 +285,16 @@ export default function WidgetPage() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? 'Envoi impossible');
         setConversationId(data.conversationId);
-        // Le serveur peut avoir retenu un autre id (collision de clé) : le jeton
-        // renvoyé est celui du canal réellement utilisé, il faut le reprendre.
-        if (data.realtimeToken) setRealtimeToken(data.realtimeToken);
         setConversationStarted(true);
         if (data.status) setStatus(data.status);
         setMessages((prev) => prev.map((m) => (m.id === temp.id ? { ...m, failed: false } : m)));
-
-        // Repli sans temps réel (jeton indisponible, p. ex. SUPABASE_JWT_SECRET
-        // non configurée) : le pipeline bot s'est exécuté pendant la requête, on
-        // relit donc la conversation pour afficher sa réponse.
-        if (!data.realtimeToken && !realtimeToken) {
-          const again = await fetch('/api/widget/session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: tokenRef.current })
-          });
-          if (again.ok) {
-            const fresh = await again.json();
-            if (Array.isArray(fresh.messages) && fresh.messages.length > 0) {
-              setMessages(fresh.messages);
-              setFeedbacks(fresh.feedback ?? {});
-            }
-            if (fresh.conversation?.status) setStatus(fresh.conversation.status);
-          }
-        }
       } catch {
         setMessages((prev) => prev.map((m) => (m.id === temp.id ? { ...m, failed: true } : m)));
       } finally {
         setSending(false);
       }
     },
-    [conversationId, realtimeToken, sending, scrollBottom]
+    [conversationId, sending, scrollBottom]
   );
 
   /**
@@ -319,6 +316,7 @@ export default function WidgetPage() {
         body: JSON.stringify({ token: tokenRef.current })
       });
       if (!res.ok) throw new Error();
+      await supabaseBrowser().auth.signOut().catch(() => {});
       try {
         localStorage.removeItem(TOKEN_KEY);
       } catch {
@@ -472,7 +470,7 @@ export default function WidgetPage() {
       >
         <div className="flex items-center gap-3">
           <div className="rounded-full ring-4 ring-white/25">
-            <BotOrb size={38} accent="#ffffff" />
+            <BotOrb size={38} accent="#ffffff" glow={typingFrom === 'bot' || sending} />
           </div>
           <div className="min-w-0 flex-1">
             <h1 className="truncate font-display text-[15px] font-semibold leading-tight">{botName}</h1>
@@ -663,24 +661,37 @@ export default function WidgetPage() {
           </form>
         )}
         <div className="flex items-end gap-2">
-          <textarea
-            value={input}
-            onChange={(e) => onInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                send(input);
+          <div className="relative min-w-0 flex-1">
+            <textarea
+              value={input}
+              maxLength={2000}
+              onChange={(e) => onInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  send(input);
+                }
+              }}
+              rows={Math.min(4, Math.max(1, input.split('\n').length))}
+              placeholder={
+                status === 'resolved'
+                  ? 'Conversation terminée — envoyez un message pour rouvrir'
+                  : 'Écrivez votre message…'
               }
-            }}
-            rows={Math.min(4, Math.max(1, input.split('\n').length))}
-            placeholder={
-              status === 'resolved'
-                ? 'Conversation terminée — envoyez un message pour rouvrir'
-                : 'Écrivez votre message…'
-            }
-            aria-label="Votre message"
-            className="max-h-32 flex-1 resize-none rounded-xl border border-mist-300 bg-white px-3.5 py-2.5 text-[14px] leading-snug outline-none transition focus:border-lagoon-400"
-          />
+              aria-label="Votre message"
+              aria-describedby="luminae-kbd-hint"
+              className="max-h-32 w-full resize-none rounded-xl border border-mist-300 bg-white px-3.5 py-2.5 text-[14px] leading-snug outline-none transition focus:border-lagoon-400"
+            />
+            {input.length >= 1500 && (
+              <span
+                className={`absolute bottom-2 right-2 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                  input.length >= 1950 ? 'bg-coral-50 text-coral-600' : 'bg-mist text-ink-500'
+                }`}
+              >
+                {input.length}/2000
+              </span>
+            )}
+          </div>
           <button
             onClick={() => send(input)}
             disabled={!input.trim() || sending}
@@ -691,6 +702,9 @@ export default function WidgetPage() {
             <SendIcon />
           </button>
         </div>
+        <p id="luminae-kbd-hint" className="mt-1 text-center text-[10.5px] text-ink-400">
+          Entrée pour envoyer · Maj+Entrée pour retour à la ligne
+        </p>
         {status === 'bot' && (
           <button
             onClick={askHuman}

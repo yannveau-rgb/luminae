@@ -4,7 +4,6 @@ import { broadcast } from '@/lib/broadcast';
 import { runBotPipeline } from '@/lib/bot-engine';
 import { notifyAgents } from '@/lib/notify';
 import { enforce, WIDGET_RULES } from '@/lib/rate-limit';
-import { tryMintVisitorToken } from '@/lib/visitor-token';
 import { isUuid } from '@/lib/utils';
 import type { Database } from '@/lib/supabase/database.types';
 import type { VisitorContext } from '@/lib/types';
@@ -13,6 +12,18 @@ type ConvRow = Database['public']['Tables']['conversations']['Row'];
 
 export const maxDuration = 60;
 
+/** Extrait et valide l'identifiant de session anonyme Supabase éventuel. */
+async function extractAuthUserId(req: Request): Promise<string | null> {
+  const authHeader = req.headers.get('authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  const jwt = authHeader.slice(7).trim();
+  if (!jwt) return null;
+  const db = supabaseAdmin();
+  const { data: { user }, error } = await db.auth.getUser(jwt);
+  if (error || !user) return null;
+  return user.id;
+}
+
 /**
  * POST /api/widget/messages
  * Message du visiteur : crée la conversation si besoin, insère le message,
@@ -20,6 +31,7 @@ export const maxDuration = 60;
  */
 export async function POST(req: Request) {
   try {
+    const authUserId = await extractAuthUserId(req);
     const body = await req.json().catch(() => ({}));
     const { token, conversationId, content, context } = body as {
       token?: string;
@@ -40,14 +52,21 @@ export async function POST(req: Request) {
 
     const db = supabaseAdmin();
     // upsert idempotent : pas de « duplicate key » si le visiteur arrive en parallèle.
+    const visitorPayload: Record<string, any> = { token, last_seen_at: new Date().toISOString() };
+    if (authUserId) visitorPayload.auth_user_id = authUserId;
+
     let { data: visitor } = await db
       .from('visitors')
-      .upsert({ token, last_seen_at: new Date().toISOString() }, { onConflict: 'token' })
+      .upsert(visitorPayload, { onConflict: 'token' })
       .select('*')
       .single();
     if (!visitor) {
       const { data: existing } = await db.from('visitors').select('*').eq('token', token).maybeSingle();
       visitor = existing;
+      if (visitor && authUserId && !visitor.auth_user_id) {
+        await db.from('visitors').update({ auth_user_id: authUserId }).eq('id', visitor.id);
+        visitor.auth_user_id = authUserId;
+      }
     }
     if (!visitor) return NextResponse.json({ error: 'Visiteur introuvable.' }, { status: 500 });
 
@@ -129,15 +148,9 @@ export async function POST(req: Request) {
     // Statut à jour (l'escalade a pu passer la conversation en « waiting »).
     const { data: fresh } = await db.from('conversations').select('id, status').eq('id', conv.id).single();
 
-    // Jeton Realtime rafraîchi : indispensable si l'id retenu diffère de celui
-    // demandé (collision de clé, la base a généré le sien) — sinon le widget
-    // resterait abonné à un canal qui ne recevra jamais rien.
-    const realtime = tryMintVisitorToken({ visitorId: visitor.id, conversationId: conv.id });
-
     return NextResponse.json({
       conversationId: conv.id,
-      status: fresh?.status ?? conv.status,
-      realtimeToken: realtime?.token ?? null
+      status: fresh?.status ?? conv.status
     });
   } catch (err: any) {
     console.error('[widget/messages]', err);

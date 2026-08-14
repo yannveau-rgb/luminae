@@ -197,10 +197,10 @@ export function InboxShell({
           selectedId && 'hidden md:flex'
         )}
       >
-        <header className="flex items-center justify-between border-b border-mist-300 px-4 py-3">
-          <Link href="/inbox" className="flex items-center gap-2">
+        <header className="flex items-center justify-between border-b border-mist-300 bg-white px-4 py-3">
+          <Link href="/inbox" className="flex items-center gap-2" title="Boîte de réception Luminae">
             <BotOrb size={26} glow={false} />
-            <span className="font-display text-base font-semibold tracking-tight">Luminae</span>
+            <h1 className="font-display text-base font-semibold tracking-tight text-ink">Luminae</h1>
           </Link>
           <div className="flex items-center gap-2">
             <button
@@ -209,7 +209,7 @@ export function InboxShell({
               title="Réponses rapides"
               aria-label="Réponses rapides"
             >
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                 <line x1="7" y1="9" x2="15" y2="9" />
                 <line x1="7" y1="13" x2="12" y2="13" />
@@ -222,9 +222,9 @@ export function InboxShell({
                 title="Administration"
                 aria-label="Administration"
               >
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
                   <circle cx="12" cy="12" r="3" />
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                 </svg>
               </Link>
             )}
@@ -234,8 +234,9 @@ export function InboxShell({
                 className="relative flex h-8 w-8 items-center justify-center rounded-full text-ink-500 transition hover:bg-mist"
                 title="Notifications"
                 aria-label="Notifications"
+                aria-expanded={notifOpen}
               >
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
                   <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
                   <path d="M13.7 21a2 2 0 0 1-3.4 0" />
                 </svg>
@@ -244,7 +245,11 @@ export function InboxShell({
                 )}
               </button>
               {notifOpen && (
-                <div className="absolute right-0 top-10 z-30 w-80 rounded-xl border border-mist-300 bg-white p-2 shadow-panel">
+                <div
+                  role="dialog"
+                  aria-label="Centre de notifications"
+                  className="absolute right-0 top-10 z-30 w-80 rounded-xl border border-mist-300 bg-white p-2 shadow-panel"
+                >
                   <div className="flex items-center justify-between px-2 pb-1 pt-1">
                     <span className="text-sm font-semibold">Notifications</span>
                     {notifs.length > 0 && (
@@ -294,7 +299,7 @@ export function InboxShell({
               title="Se déconnecter"
               aria-label="Se déconnecter"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                 <polyline points="16 17 21 12 16 7" />
                 <line x1="21" y1="12" x2="9" y2="12" />
@@ -303,8 +308,7 @@ export function InboxShell({
           </div>
         </header>
 
-        {/* Mode dégradé : l'agent doit savoir que sa liste n'est plus vivante,
-            sinon il fait confiance à un affichage qui ne bouge plus. */}
+        {/* Mode dégradé : l'agent doit savoir que sa liste n'est plus vivante */}
         {realtimeDown && (
           <p
             role="status"
@@ -315,7 +319,7 @@ export function InboxShell({
         )}
 
         {/* Onglets */}
-        <div className="flex gap-1 px-4 pt-3">
+        <div role="tablist" aria-label="État des conversations" className="flex gap-1 px-4 pt-3">
           {(
             [
               ['open', 'En cours'],
@@ -324,6 +328,8 @@ export function InboxShell({
           ).map(([key, label]) => (
             <button
               key={key}
+              role="tab"
+              aria-selected={tab === key}
               onClick={() => setTab(key)}
               className={cn(
                 'rounded-full px-3 py-1.5 text-sm font-medium transition',
@@ -337,7 +343,19 @@ export function InboxShell({
 
         {/* Liste des conversations */}
         <ul className="mt-2 flex-1 overflow-y-auto">
-          {loading && <li className="px-4 py-6 text-center text-sm text-ink-400">Chargement…</li>}
+          {loading && (
+            <li className="space-y-3 px-4 py-3">
+              {[1, 2, 3, 4].map((n) => (
+                <div key={n} className="flex animate-pulse items-center gap-3 rounded-xl bg-white p-3">
+                  <div className="h-10 w-10 shrink-0 rounded-full bg-mist-300" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-28 rounded bg-mist-300" />
+                    <div className="h-3 w-44 rounded bg-mist-200" />
+                  </div>
+                </div>
+              ))}
+            </li>
+          )}
           {!loading && items.length === 0 && (
             <li className="px-4 py-8 text-center text-sm text-ink-400">
               {tab === 'open' ? 'Aucune conversation en cours. 🎉' : 'Aucune conversation résolue.'}
