@@ -1,16 +1,9 @@
 'use client';
 
-/** Éléments visuels du widget — orbe signature du bot, indicateurs, avatars. */
+/** Éléments visuels haut de gamme du widget public — orbe signature du bot, indicateurs, avatars, boutons. */
 
-/**
- * Orbe du bot — l'élément signature du système « Lumen ».
- *
- * `glow` combine `shadow-halo` (valeur de repos) et `animate-halo-breathe`
- * (respiration). Ce n'est pas redondant : l'animation n'a pas de fill-mode, or
- * sous `prefers-reduced-motion` globals.css ramène sa durée à 0,01 ms — elle
- * s'achevait donc aussitôt et l'orbe restait sans aucun halo. Le token garantit
- * la présence de l'effet, que l'animation joue ou non.
- */
+import { cn } from '@/lib/utils';
+
 export function BotOrb({
   size = 40,
   accent = 'var(--accent)',
@@ -23,14 +16,16 @@ export function BotOrb({
   return (
     <div
       aria-hidden
-      className={`relative shrink-0 rounded-full ${glow ? 'shadow-halo animate-halo-breathe' : ''}`}
+      className={cn(
+        'relative shrink-0 rounded-full transition-transform',
+        glow ? 'shadow-halo animate-halo-breathe' : 'shadow-sm'
+      )}
       style={{
         width: size,
         height: size,
         background: `radial-gradient(circle at 30% 25%, color-mix(in srgb, ${accent} 45%, white), ${accent} 62%, color-mix(in srgb, ${accent} 78%, #081624))`
       }}
     >
-      {/* Étincelle centrale */}
       <svg
         viewBox="0 0 24 24"
         className="absolute inset-0 m-auto"
@@ -57,7 +52,7 @@ export function AgentAvatar({ name, size = 32 }: { name: string; size?: number }
   return (
     <div
       aria-hidden
-      className="flex shrink-0 items-center justify-center rounded-full bg-ink-700 font-display font-semibold text-white"
+      className="flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-lagoon-600 to-lagoon-700 font-display font-bold text-white shadow-sm ring-1 ring-black/5"
       style={{ width: size, height: size, fontSize: size * 0.38 }}
     >
       {initials || '?'}
@@ -80,25 +75,29 @@ export function TypingDots({ accent = 'var(--accent)' }: { accent?: string }) {
 }
 
 /** Puce de question suggérée (état vide engageant). */
-export function SuggestionChip({ label, onPick }: { label: string; onPick: (label: string) => void }) {
+export function SuggestionChip({
+  label,
+  icon,
+  onPick
+}: {
+  label: string;
+  icon?: string;
+  onPick: (label: string) => void;
+}) {
   return (
     <button
       onClick={() => onPick(label)}
-      className="animate-fade-in rounded-full border px-3.5 py-2 text-left text-[13px] font-medium transition hover:-translate-y-px"
-      style={{
-        borderColor: 'color-mix(in srgb, var(--accent) 35%, white)',
-        background: 'color-mix(in srgb, var(--accent) 7%, white)',
-        color: 'color-mix(in srgb, var(--accent) 75%, #0F2233)'
-      }}
+      className="animate-fade-in flex items-center gap-2 rounded-xl border border-mist-300 bg-white/90 px-3.5 py-2 text-left text-xs font-semibold text-ink-700 shadow-sm backdrop-blur-sm transition duration-200 hover:-translate-y-0.5 hover:border-lagoon-300 hover:bg-lagoon-50/60 hover:text-lagoon-700 hover:shadow-glow-sm"
     >
-      {label}
+      {icon && <span className="text-sm">{icon}</span>}
+      <span>{label}</span>
     </button>
   );
 }
 
 export function SendIcon({ className = 'h-4 w-4' }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
       <path d="M22 2 11 13" />
       <path d="M22 2 15 22l-4-9-9-4 20-7Z" />
     </svg>

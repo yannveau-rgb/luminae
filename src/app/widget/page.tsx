@@ -1,9 +1,8 @@
 'use client';
 
 /**
- * Widget de chat public — chargé dans une iframe via /embed.js.
- * Design « Lumen » : orbe lumineux du bot, apparition des messages en
- * élévation, indicateur de frappe à trois points.
+ * Widget de chat public haute performance — chargé dans une iframe ou en direct.
+ * Ambiance Luminae « Lumen » : orbe lumineux, accueil interactif, bulles dépolies, RAG et escalade fluide.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -64,31 +63,18 @@ function getVisitorToken(): string {
   }
 }
 
-/**
- * Vérifie qu'un émetteur ne déclare que sa propre URL.
- *
- * L'écoute `postMessage` ne contrôlait pas l'origine : n'importe quelle fenêtre
- * pouvait annoncer l'URL de son choix, laquelle finissait en base
- * (`conversations.source_url`), dans les prompts Mistral et sous les yeux des
- * agents (constat S-06). Plutôt qu'une liste blanche à dupliquer côté client,
- * on exige que l'origine du message et celle de l'URL annoncée coïncident : un
- * site ne peut donc parler que pour lui-même. Le contrôle de « qui a le droit
- * de nous cadrer » reste assuré par `frame-ancestors` côté serveur.
- */
 function claimedUrlFrom(event: MessageEvent): string | null {
   if (!event.data || event.data.type !== 'luminae:init') return null;
   const href = typeof event.data.href === 'string' ? event.data.href : '';
   if (!href) return null;
 
-  const claimed = new URL(href); // lève si l'URL est invalide — attrapé plus haut
+  const claimed = new URL(href);
   if (claimed.protocol !== 'http:' && claimed.protocol !== 'https:') return null;
-  // « null » = origine opaque (sandbox, data:) : jamais digne de confiance.
   if (event.origin === 'null' || claimed.origin !== event.origin) return null;
 
   return href;
 }
 
-/** URL de la page hôte : transmise par embed.js (postMessage), sinon referrer. */
 function detectPageUrl(): Promise<string> {
   return new Promise((resolve) => {
     const fallback = () => resolve(document.referrer || window.location.href);
@@ -98,9 +84,8 @@ function detectPageUrl(): Promise<string> {
       try {
         href = claimedUrlFrom(e);
       } catch {
-        href = null; // origine inexploitable (opaque, protocole exotique)
+        href = null;
       }
-      // Un message rejeté ne clôt pas l'écoute : le message légitime peut suivre.
       if (!href) return;
       clearTimeout(timer);
       window.removeEventListener('message', onMsg);
@@ -120,11 +105,7 @@ export default function WidgetPage() {
   const [typingFrom, setTypingFrom] = useState<'bot' | 'agent' | null>(null);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
-  /** Jeton signé par le serveur : autorise l'abonnement au canal privé. */
-  const [realtimeToken, setRealtimeToken] = useState<string | null>(null);
-  /** La conversation existe-t-elle côté serveur (au moins un message envoyé) ? */
   const [conversationStarted, setConversationStarted] = useState(false);
-  /** Prénom du visiteur, s'il a bien voulu le donner. */
   const [visitorName, setVisitorName] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState('');
   const [nameDismissed, setNameDismissed] = useState(false);
@@ -140,7 +121,6 @@ export default function WidgetPage() {
     requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }));
   }, []);
 
-  // ── Initialisation : contexte + session ────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -172,9 +152,6 @@ export default function WidgetPage() {
         setSettings(data.settings);
         setMessages(data.messages ?? []);
         setFeedbacks(data.feedback ?? {});
-        // Le serveur fournit l'identifiant du canal — celui de la conversation
-        // en cours, ou un identifiant pré-alloué pour la prochaine. On peut donc
-        // s'abonner avant le premier message sans choisir soi-même une clé.
         if (data.conversationId) setConversationId(data.conversationId);
         setVisitorName(data.visitorName ?? null);
         if (data.conversation) {
@@ -191,10 +168,6 @@ export default function WidgetPage() {
     };
   }, []);
 
-  // ── Temps réel : nouveaux messages, saisie, statut ─────────────────────
-  // Canal PRIVÉ : Realtime vérifie l'abonnement contre les policies de
-  // `realtime.messages` (migration 0014). La session anonyme Supabase
-  // fournit auth.uid() vérifié par la policy sans clé symétrique partagée.
   useEffect(() => {
     if (!conversationId) return;
     const supabase = supabaseBrowser();
@@ -248,156 +221,105 @@ export default function WidgetPage() {
     if (phase === 'ready') scrollBottom();
   }, [phase, messages.length, scrollBottom]);
 
-  // ── Actions ─────────────────────────────────────────────────────────────
-  const send = useCallback(
-    async (raw: string) => {
-      const text = raw.trim();
-      if (!text || sending) return;
-      setSending(true);
-      setInput('');
-      const convId = conversationId;
-      const temp: UiMessage = {
-        id: `temp-${Date.now()}`,
-        sender: 'visitor',
-        content: text,
-        created_at: new Date().toISOString(),
-        temp: true
-      };
-      setMessages((prev) => [...prev, temp]);
-      scrollBottom();
-      try {
-        const supabase = supabaseBrowser();
-        const { data: authData } = await supabase.auth.getSession();
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-        if (authData.session?.access_token) {
-          headers['Authorization'] = `Bearer ${authData.session.access_token}`;
-        }
-        const res = await fetch('/api/widget/messages', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            token: tokenRef.current,
-            conversationId: convId,
-            content: text,
-            context: contextRef.current
-          })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? 'Envoi impossible');
-        setConversationId(data.conversationId);
-        setConversationStarted(true);
-        if (data.status) setStatus(data.status);
-        setMessages((prev) => prev.map((m) => (m.id === temp.id ? { ...m, failed: false } : m)));
-      } catch {
-        setMessages((prev) => prev.map((m) => (m.id === temp.id ? { ...m, failed: true } : m)));
-      } finally {
-        setSending(false);
-      }
-    },
-    [conversationId, sending, scrollBottom]
-  );
+  async function send(content: string) {
+    const text = content.trim();
+    if (!text || sending) return;
+    setSending(true);
+    setInput('');
+    const tempId = `tmp-${Date.now()}`;
+    const optimistic: UiMessage = {
+      id: tempId,
+      sender: 'visitor',
+      content: text,
+      created_at: new Date().toISOString(),
+      temp: true
+    };
+    setMessages((prev) => [...prev, optimistic]);
+    scrollBottom();
 
-  /**
-   * Droit à l'effacement. Irréversible, donc confirmé — et on repart d'une
-   * identité neuve : sans nouveau token, la conversation supprimée resterait
-   * affichée jusqu'au rechargement.
-   */
-  const eraseData = useCallback(async () => {
-    if (erasing) return;
-    const ok = window.confirm(
-      'Supprimer définitivement votre historique de conversation et vos données ? Cette action est irréversible.'
-    );
-    if (!ok) return;
-    setErasing(true);
     try {
-      const res = await fetch('/api/widget/erase', {
+      const res = await fetch('/api/widget/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: tokenRef.current })
+        body: JSON.stringify({
+          conversationId,
+          content: text,
+          token: tokenRef.current,
+          context: contextRef.current
+        })
       });
-      if (!res.ok) throw new Error();
-      await supabaseBrowser().auth.signOut().catch(() => {});
-      try {
-        localStorage.removeItem(TOKEN_KEY);
-      } catch {
-        /* stockage indisponible : le rechargement en générera un neuf */
-      }
-      window.location.reload();
-    } catch {
-      setErasing(false);
-      window.alert('La suppression n’a pas pu être effectuée. Réessayez dans un instant.');
-    }
-  }, [erasing]);
-
-  /** Enregistre le prénom donné par le visiteur. */
-  const submitName = useCallback(async () => {
-    const proposed = nameDraft.trim();
-    if (!proposed) return;
-    // Optimiste : le champ disparaît immédiatement, un échec le ramène.
-    setVisitorName(proposed);
-    try {
-      const res = await fetch('/api/widget/identify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: tokenRef.current, name: proposed })
-      });
-      if (!res.ok) throw new Error();
       const data = await res.json();
-      if (data.visitorName) setVisitorName(data.visitorName);
-      setNameDraft('');
-    } catch {
-      setVisitorName(null);
-    }
-  }, [nameDraft]);
-
-  const vote = useCallback(
-    async (messageId: string, value: 'up' | 'down') => {
-      if (feedbacks[messageId]) return;
-      setFeedbacks((prev) => ({ ...prev, [messageId]: value }));
-      try {
-        const res = await fetch('/api/widget/feedback', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messageId, value, token: tokenRef.current })
-        });
-        if (!res.ok) throw new Error();
-      } catch {
-        setFeedbacks((prev) => {
-          const copy = { ...prev };
-          delete copy[messageId];
-          return copy;
-        });
+      if (!res.ok) throw new Error(data.error);
+      if (data.conversationId && data.conversationId !== conversationId) {
+        setConversationId(data.conversationId);
       }
-    },
-    [feedbacks]
-  );
-
-  const askHuman = useCallback(async () => {
-    // Tant qu'aucun message n'a été envoyé, la conversation n'existe pas encore
-    // en base (seul son identifiant est réservé) : on l'ouvre par un message.
-    if (!conversationId || !conversationStarted) {
-      await send('Je souhaite parler à un agent, merci.');
-      return;
+      setConversationStarted(true);
+    } catch {
+      setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, failed: true } : m)));
+    } finally {
+      setSending(false);
     }
+  }
+
+  async function askHuman() {
+    if (!conversationId) return;
     try {
       const res = await fetch('/api/widget/escalate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: tokenRef.current, conversationId })
+        body: JSON.stringify({ conversationId, token: tokenRef.current })
       });
-      const data = await res.json();
-      if (data.status) setStatus(data.status);
-    } catch {
-      /* le statut sera resynchronisé au prochain message */
-    }
-  }, [conversationId, conversationStarted, send]);
+      if (res.ok) {
+        setStatus('waiting');
+      }
+    } catch {}
+  }
 
-  /** Indicateur de saisie du visiteur, relayé vers les agents (throttlé). */
+  async function vote(messageId: string, value: 'up' | 'down') {
+    setFeedbacks((prev) => ({ ...prev, [messageId]: value }));
+    fetch('/api/widget/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messageId, value, token: tokenRef.current })
+    }).catch(() => {});
+  }
+
+  async function submitName() {
+    const n = nameDraft.trim();
+    if (!n) return;
+    setVisitorName(n);
+    setNameDraft('');
+    fetch('/api/widget/visitor-name', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: n, token: tokenRef.current })
+    }).catch(() => {});
+  }
+
+  async function eraseData() {
+    if (erasing) return;
+    if (!window.confirm('Voulez-vous vraiment effacer l’ensemble de vos conversations ? Cette action est irréversible.')) {
+      return;
+    }
+    setErasing(true);
+    try {
+      await fetch('/api/widget/gdpr-erasure', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: tokenRef.current })
+      });
+      try {
+        localStorage.removeItem(TOKEN_KEY);
+      } catch {}
+      window.location.reload();
+    } catch {
+      setErasing(false);
+    }
+  }
+
   const onInput = useCallback(
-    (value: string) => {
-      setInput(value);
-      // La route exige désormais le token visiteur et vérifie qu'il correspond
-      // bien à la conversation ; inutile d'appeler avant le premier message.
+    (val: string) => {
+      setInput(val);
       if (!conversationId || !conversationStarted) return;
       const ping = (typing: boolean) =>
         fetch('/api/widget/typing', {
@@ -417,26 +339,24 @@ export default function WidgetPage() {
     [conversationId, conversationStarted]
   );
 
-  const accent = settings?.accent_color ?? '#0E8C7D';
-  const botName = settings?.bot_name ?? 'Assistant';
+  const accent = settings?.accent_color ?? '#0B7A6E';
+  const botName = settings?.bot_name ?? 'Assistant Luminae';
   const hasVisitorMessage = messages.some((m) => m.sender === 'visitor');
-  // Le visiteur doit savoir à qui il parle : « En ligne » laissait croire à une
-  // présence humaine. La mention disparaît dès qu'un agent prend le relais.
+
   const statusLine =
     status === 'bot'
-      ? 'Assistant automatique · réponse immédiate'
+      ? 'Assistant IA · Réponse instantanée'
       : status === 'waiting'
-        ? 'Vous êtes en file d’attente'
+        ? 'Conseiller notifié · En attente'
         : status === 'assigned'
-          ? 'Un agent vous répond'
+          ? 'Conseiller en ligne'
           : 'Conversation terminée';
 
-  // ── Rendu ───────────────────────────────────────────────────────────────
   if (phase === 'loading') {
     return (
       <main className="flex h-[100dvh] flex-col items-center justify-center gap-4 bg-gradient-to-b from-white to-mist">
         <BotOrb size={56} />
-        <p className="font-display text-sm font-medium text-ink-600">Connexion à l’assistant…</p>
+        <p className="font-display text-xs font-semibold text-ink-600">Connexion à Luminae…</p>
       </main>
     );
   }
@@ -444,11 +364,11 @@ export default function WidgetPage() {
   if (phase === 'error') {
     return (
       <main className="flex h-[100dvh] flex-col items-center justify-center gap-3 bg-gradient-to-b from-white to-mist px-6 text-center">
-        <p className="font-display text-base font-semibold text-ink">L’assistant n’a pas pu être chargé.</p>
-        <p className="text-sm text-ink-500">Vérifiez votre connexion Internet puis réessayez.</p>
+        <p className="font-display text-sm font-bold text-ink">L’assistant n’a pas pu être chargé.</p>
+        <p className="text-xs text-ink-500">Vérifiez votre connexion Internet puis réessayez.</p>
         <button
           onClick={() => window.location.reload()}
-          className="mt-2 rounded-full bg-lagoon-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-lagoon-700"
+          className="mt-2 rounded-xl bg-lagoon-600 px-5 py-2.5 text-xs font-semibold text-white shadow-glow-sm transition hover:bg-lagoon-500"
         >
           Réessayer
         </button>
@@ -458,21 +378,19 @@ export default function WidgetPage() {
 
   return (
     <main
-      className="flex h-[100dvh] flex-col overflow-hidden bg-gradient-to-b from-white to-mist font-sans text-ink"
+      className="flex h-[100dvh] flex-col overflow-hidden bg-gradient-to-b from-white via-mist-50 to-mist font-sans text-ink"
       style={{ '--accent': accent, '--focus-color': accent } as React.CSSProperties}
     >
-      {/* En-tête moderne en verre dépoli */}
-      <header
-        className="relative z-10 flex shrink-0 items-center justify-between border-b border-mist-300/80 bg-white/90 px-4 py-3.5 backdrop-blur-md"
-      >
+      {/* ── En-tête haut de gamme en verre dépoli ────────────────────────────── */}
+      <header className="relative z-10 flex shrink-0 items-center justify-between border-b border-mist-300/80 bg-white/90 px-4 py-3.5 backdrop-blur-md shadow-sm">
         <div className="flex min-w-0 items-center gap-3">
           {status === 'bot' ? (
-            <BotOrb size={34} accent={accent} glow={typingFrom === 'bot'} />
+            <BotOrb size={36} accent={accent} glow={typingFrom === 'bot'} />
           ) : (
-            <AgentAvatar name={botName} size={34} />
+            <AgentAvatar name={botName} size={36} />
           )}
           <div className="min-w-0">
-            <h1 className="truncate font-display text-sm font-semibold tracking-tight text-ink">{botName}</h1>
+            <h1 className="truncate font-display text-sm font-bold tracking-tight text-ink">{botName}</h1>
             <p className="flex items-center gap-1.5 text-[11px] text-ink-500 font-medium">
               <span
                 className={`h-2 w-2 rounded-full ${
@@ -485,58 +403,102 @@ export default function WidgetPage() {
           </div>
         </div>
 
-        {status === 'bot' && (
+        <div className="flex items-center gap-1.5">
+          {status === 'bot' && (
+            <button
+              onClick={askHuman}
+              aria-label="Parler à un conseiller humain"
+              title="Demander un conseiller humain"
+              className="flex items-center gap-1.5 rounded-xl border border-mist-300 bg-white/90 px-3 py-1.5 text-xs font-semibold text-ink-700 shadow-sm transition hover:border-lagoon-300 hover:bg-lagoon-50 hover:text-lagoon-700"
+            >
+              <HumanIcon className="h-3.5 w-3.5 text-lagoon-600" />
+              <span>Humain</span>
+            </button>
+          )}
+
           <button
-            onClick={askHuman}
-            aria-label="Parler à un conseiller humain"
-            title="Parler à un conseiller humain"
-            className="flex items-center gap-1 rounded-full border border-mist-300 bg-white/80 px-2.5 py-1.5 text-xs font-medium text-ink-600 shadow-sm transition hover:bg-lagoon-50 hover:text-lagoon-700 hover:border-lagoon-200"
+            onClick={() => window.location.reload()}
+            aria-label="Recommencer la conversation"
+            title="Recommencer"
+            className="flex h-8 w-8 items-center justify-center rounded-xl text-ink-400 transition hover:bg-mist hover:text-ink"
           >
-            <HumanIcon className="h-3.5 w-3.5" />
-            <span className="text-[11px]">Humain</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+            </svg>
           </button>
-        )}
+        </div>
       </header>
 
-      {/* Fil de messages */}
-      <div className="flex-1 overflow-y-auto px-3.5 py-4" aria-live="polite">
-        <div className="space-y-3">
-          {messages.length === 0 && settings && (
-            <MessageRow bot accent={accent} name={botName}>
-              {settings.welcome_message}
-            </MessageRow>
+      {/* ── Fil de messages & Accueil ────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto px-4 py-4" aria-live="polite">
+        <div className="space-y-3.5">
+          {/* Carte d'accueil engageante si premier contact */}
+          {!hasVisitorMessage && settings && (
+            <div className="animate-fade-in my-2 rounded-2xl border border-aurora-300/80 bg-white p-4 shadow-sm text-center">
+              <div className="flex justify-center mb-2">
+                <BotOrb size={44} accent={accent} glow />
+              </div>
+              <h2 className="font-display text-sm font-bold text-ink">Bienvenue sur notre support en direct</h2>
+              <p className="mt-1 text-xs text-ink-600 leading-relaxed max-w-xs mx-auto">
+                {settings.welcome_message}
+              </p>
+              <div className="mt-2.5 inline-flex items-center gap-1 rounded-full bg-lagoon-50 px-2.5 py-0.5 text-[10.5px] font-semibold text-lagoon-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-lagoon-500 animate-pulse" />
+                <span>Temps de réponse moyen : 10 secondes</span>
+              </div>
+            </div>
+          )}
+
+          {/* Suggestions de questions rapides */}
+          {!hasVisitorMessage && settings && settings.suggestions.length > 0 && (
+            <div className="space-y-1.5 pt-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-400 px-1">Questions fréquentes :</p>
+              <div className="flex flex-col gap-2">
+                {settings.suggestions.map((s, idx) => (
+                  <SuggestionChip
+                    key={s}
+                    label={s}
+                    icon={idx === 0 ? '✨' : idx === 1 ? '💳' : '⚡'}
+                    onPick={(label) => send(label)}
+                  />
+                ))}
+              </div>
+            </div>
           )}
 
           {messages.map((m) => {
             if (m.sender === 'system') {
               return (
-                <div key={m.id} className="animate-fade-in flex justify-center">
-                  <span className="rounded-full bg-mist px-3 py-1 text-center text-[12px] text-ink-500">
+                <div key={m.id} className="animate-fade-in flex justify-center my-2">
+                  <span className="rounded-full bg-mist-200/80 px-3 py-1 text-center text-[11px] font-medium text-ink-500">
                     {m.content}
                   </span>
                 </div>
               );
             }
+
             if (m.sender === 'visitor') {
               return (
                 <div key={m.id} className="animate-msg-in flex justify-end">
                   <div
-                    className="max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-br-md px-3.5 py-2.5 text-[14px] leading-relaxed text-white shadow-bubble"
+                    className="max-w-[82%] whitespace-pre-wrap rounded-2xl rounded-br-sm px-4 py-2.5 text-xs leading-relaxed text-white shadow-bubble font-medium"
                     style={{ background: m.failed ? '#E25C4A' : accent }}
                   >
                     {m.content}
-                    {m.failed && <p className="mt-1 text-[11px] text-white/85">Échec de l’envoi — réessayez.</p>}
+                    {m.failed && <p className="mt-1 text-[10.5px] text-white/85">Échec de l’envoi — réessayez.</p>}
                   </div>
                 </div>
               );
             }
+
             return (
-              <MessageRow key={m.id} bot={m.sender === 'bot'} accent={accent} name={m.agent_name || 'Agent'}>
+              <MessageRow key={m.id} bot={m.sender === 'bot'} accent={accent} name={m.agent_name || 'Conseiller'}>
                 {m.content_html ? (
                   <div className="rich-content" dangerouslySetInnerHTML={{ __html: m.content_html }} />
                 ) : (
                   m.content
                 )}
+
                 {m.attachments && m.attachments.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {m.attachments.map((a) =>
@@ -545,7 +507,7 @@ export default function WidgetPage() {
                           <img
                             src={a.url}
                             alt={a.file_name ?? 'Pièce jointe'}
-                            className="max-h-40 max-w-[200px] rounded-lg border border-mist-300 object-cover"
+                            className="max-h-40 max-w-[200px] rounded-xl border border-mist-300 object-cover"
                           />
                         </a>
                       ) : (
@@ -562,48 +524,43 @@ export default function WidgetPage() {
                     )}
                   </div>
                 )}
+
                 {m.sender === 'bot' && (
-                  <div className="mt-2 flex items-center gap-1.5 border-t border-mist-300/70 pt-1.5">
-                    {feedbacks[m.id] ? (
-                      <span className="text-[11.5px] font-medium text-ink-400">Merci pour votre retour !</span>
-                    ) : (
-                      <>
-                        <span className="text-[11.5px] text-ink-400">Utile ?</span>
-                        <button
-                          onClick={() => vote(m.id, 'up')}
-                          aria-label="Cette réponse est utile"
-                          className="rounded-full p-1 text-ink-500 transition hover:bg-lagoon-50 hover:text-lagoon-600"
-                        >
-                          <ThumbIcon up />
-                        </button>
-                        <button
-                          onClick={() => vote(m.id, 'down')}
-                          aria-label="Cette réponse n’est pas utile"
-                          className="rounded-full p-1 text-ink-500 transition hover:bg-coral-50 hover:text-coral-600"
-                        >
-                          <ThumbIcon up={false} />
-                        </button>
-                      </>
-                    )}
+                  <div className="mt-2.5 flex items-center justify-between border-t border-mist-200/80 pt-2 text-[11px] text-ink-400">
+                    <span className="text-[10px] font-semibold text-aurora-600">RAG Luminae</span>
+                    <div className="flex items-center gap-1.5">
+                      {feedbacks[m.id] ? (
+                        <span className="font-semibold text-lagoon-600">Merci pour votre retour !</span>
+                      ) : (
+                        <>
+                          <span>Utile ?</span>
+                          <button
+                            onClick={() => vote(m.id, 'up')}
+                            aria-label="Cette réponse est utile"
+                            className="rounded-lg p-1 text-ink-400 transition hover:bg-lagoon-50 hover:text-lagoon-600"
+                          >
+                            <ThumbIcon up />
+                          </button>
+                          <button
+                            onClick={() => vote(m.id, 'down')}
+                            aria-label="Cette réponse n’est pas utile"
+                            className="rounded-lg p-1 text-ink-400 transition hover:bg-coral-50 hover:text-coral-600"
+                          >
+                            <ThumbIcon up={false} />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 )}
               </MessageRow>
             );
           })}
 
-          {/* Suggestions (état vide engageant) */}
-          {!hasVisitorMessage && settings && settings.suggestions.length > 0 && (
-            <div className="flex flex-wrap gap-2 pl-9 pt-1">
-              {settings.suggestions.map((s) => (
-                <SuggestionChip key={s} label={s} onPick={(label) => send(label)} />
-              ))}
-            </div>
-          )}
-
           {/* Indicateur de frappe */}
           {typingFrom && (
             <div className="animate-msg-in">
-              <MessageRow bot={typingFrom === 'bot'} accent={accent} name={typingFrom === 'bot' ? botName : 'Agent'}>
+              <MessageRow bot={typingFrom === 'bot'} accent={accent} name={typingFrom === 'bot' ? botName : 'Conseiller'}>
                 <TypingDots accent={accent} />
               </MessageRow>
             </div>
@@ -613,27 +570,24 @@ export default function WidgetPage() {
         </div>
       </div>
 
-      {/* Composeur */}
-      <footer className="border-t border-mist-300 bg-white px-3 pb-2 pt-3">
+      {/* ── Composeur flottant ────────────────────────────────────────────── */}
+      <footer className="border-t border-mist-300/80 bg-white/95 px-3.5 pb-2.5 pt-3 backdrop-blur-md">
         {status === 'waiting' && (
-          <p className="mb-2 text-center text-[12px] font-medium text-sun-600">
-            Un agent va prendre le relais — vous pouvez ajouter des précisions.
+          <p className="mb-2 text-center text-xs font-semibold text-sun-600 animate-pulse">
+            Un conseiller prépare sa réponse — vous pouvez ajouter des précisions ci-dessous.
           </p>
         )}
 
-        {/* Prénom demandé seulement une fois un humain impliqué : pendant la
-            phase bot, la question serait un péage inutile à l'entrée. Refusable
-            — l'échange continue sans, la conversation reste anonyme. */}
         {(status === 'waiting' || status === 'assigned') && !visitorName && !nameDismissed && (
           <form
             onSubmit={(e) => {
               e.preventDefault();
               submitName();
             }}
-            className="mb-2 rounded-xl border border-mist-300 bg-mist-50 px-3 py-2.5"
+            className="mb-2.5 animate-slide-up rounded-xl border border-lagoon-300 bg-lagoon-50/70 p-3 shadow-sm"
           >
-            <label htmlFor="luminae-prenom" className="block text-[12px] font-medium text-ink-700">
-              Votre prénom, pour que l’équipe sache à qui elle répond
+            <label htmlFor="luminae-prenom" className="block text-xs font-semibold text-lagoon-700">
+              Quel est votre prénom ? (pour personnaliser l&apos;échange)
             </label>
             <div className="mt-1.5 flex items-center gap-1.5">
               <input
@@ -642,13 +596,13 @@ export default function WidgetPage() {
                 onChange={(e) => setNameDraft(e.target.value)}
                 maxLength={60}
                 autoComplete="given-name"
-                placeholder="Prénom"
-                className="min-w-0 flex-1 rounded-lg border border-mist-300 bg-white px-2.5 py-1.5 text-[13px] outline-none transition focus:border-lagoon-400"
+                placeholder="Ex. Sophie"
+                className="min-w-0 flex-1 rounded-xl border border-mist-300 bg-white px-3 py-1.5 text-xs outline-none transition focus:border-lagoon-400"
               />
               <button
                 type="submit"
                 disabled={!nameDraft.trim()}
-                className="shrink-0 rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white transition disabled:opacity-40"
+                className="shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-white transition disabled:opacity-40 shadow-glow-sm"
                 style={{ background: accent }}
               >
                 Valider
@@ -656,13 +610,14 @@ export default function WidgetPage() {
               <button
                 type="button"
                 onClick={() => setNameDismissed(true)}
-                className="shrink-0 rounded-lg px-2 py-1.5 text-[12px] font-medium text-ink-500 transition hover:bg-mist"
+                className="shrink-0 rounded-xl px-2.5 py-1.5 text-xs font-medium text-ink-500 hover:bg-mist"
               >
                 Plus tard
               </button>
             </div>
           </form>
         )}
+
         <div className="flex items-end gap-2">
           <div className="relative min-w-0 flex-1">
             <textarea
@@ -678,16 +633,15 @@ export default function WidgetPage() {
               rows={Math.min(4, Math.max(1, input.split('\n').length))}
               placeholder={
                 status === 'resolved'
-                  ? 'Conversation terminée — envoyez un message pour rouvrir'
+                  ? 'Conversation terminée — écrivez pour rouvrir'
                   : 'Écrivez votre message…'
               }
               aria-label="Votre message"
-              aria-describedby="luminae-kbd-hint"
-              className="max-h-32 w-full resize-none rounded-xl border border-mist-300 bg-white px-3.5 py-2.5 text-[14px] leading-snug outline-none transition focus:border-lagoon-400"
+              className="max-h-32 w-full resize-none rounded-xl border border-mist-300 bg-mist-50/50 px-3.5 py-2.5 text-xs leading-relaxed text-ink outline-none transition focus:border-lagoon-400 focus:bg-white focus:ring-2 focus:ring-lagoon-400/20"
             />
             {input.length >= 1500 && (
               <span
-                className={`absolute bottom-2 right-2 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                className={`absolute bottom-2 right-2 rounded px-1.5 py-0.5 text-[9.5px] font-medium ${
                   input.length >= 1950 ? 'bg-coral-50 text-coral-600' : 'bg-mist text-ink-500'
                 }`}
               >
@@ -695,36 +649,27 @@ export default function WidgetPage() {
               </span>
             )}
           </div>
+
           <button
             onClick={() => send(input)}
             disabled={!input.trim() || sending}
             aria-label="Envoyer le message"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white shadow-bubble transition enabled:hover:opacity-90 disabled:opacity-40"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-bubble transition hover:opacity-90 disabled:opacity-40"
             style={{ background: accent }}
           >
-            <SendIcon />
+            <SendIcon className="h-4 w-4" />
           </button>
         </div>
-        <p id="luminae-kbd-hint" className="mt-1 text-center text-[10.5px] text-ink-400">
-          Entrée pour envoyer · Maj+Entrée pour retour à la ligne
+
+        <p className="mt-1 text-center text-[10px] text-ink-400 font-medium">
+          Entrée pour envoyer · Maj+Entrée pour retour ligne
         </p>
-        {status === 'bot' && (
-          <button
-            onClick={askHuman}
-            className="mx-auto mt-2 flex items-center gap-1.5 text-[12px] font-medium text-ink-400 transition hover:text-ink"
-          >
-            <HumanIcon className="h-3.5 w-3.5" />
-            Parler à un humain
-          </button>
-        )}
       </footer>
-      {/* Pied : transparence sur le traitement, et droit à l'effacement.
-          Un visiteur doit pouvoir savoir qui traite ses données et les
-          supprimer sans écrire à personne (constat S-11). */}
-      <div className="bg-white px-3 pb-2 text-center text-[10.5px] leading-relaxed text-ink-400">
+
+      {/* ── Pied de page légal et droit à l'effacement ──────────────────────── */}
+      <div className="bg-white px-3 pb-2 text-center text-[10px] text-ink-400 border-t border-mist-200/60">
         <p>
-          Propulsé par <span className="font-display font-semibold">Luminae</span> · assistant IA,
-          réponses générées par Mistral AI (UE)
+          Propulsé par <span className="font-display font-bold text-ink-700">Luminae</span> · IA souveraine Mistral (UE)
         </p>
         <p className="mt-0.5">
           {settings?.privacy_url && (
@@ -733,7 +678,7 @@ export default function WidgetPage() {
                 href={settings.privacy_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="underline underline-offset-2 hover:text-ink"
+                className="underline underline-offset-2 hover:text-ink font-medium"
               >
                 Confidentialité
               </a>
@@ -743,7 +688,7 @@ export default function WidgetPage() {
           <button
             type="button"
             onClick={eraseData}
-            className="underline underline-offset-2 hover:text-ink"
+            className="underline underline-offset-2 hover:text-ink font-medium"
           >
             {erasing ? 'Suppression…' : 'Supprimer mes données'}
           </button>
@@ -753,7 +698,7 @@ export default function WidgetPage() {
   );
 }
 
-/** Bulle avec avatar (orbe du bot ou initiales d’agent). */
+/** Bulle avec avatar et ombre douce. */
 function MessageRow({
   bot,
   accent,
@@ -766,15 +711,13 @@ function MessageRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="animate-msg-in flex items-end gap-2">
-      {bot ? <BotOrb size={26} accent={accent} glow={false} /> : <AgentAvatar name={name} size={26} />}
-      <div className="max-w-[80%] min-w-0">
-        <div className="whitespace-pre-wrap rounded-2xl rounded-bl-md border border-mist-300 bg-white px-3.5 py-2.5 text-[14px] leading-relaxed text-ink shadow-bubble">
+    <div className="animate-msg-in flex items-end gap-2.5">
+      {bot ? <BotOrb size={28} accent={accent} glow={false} /> : <AgentAvatar name={name} size={28} />}
+      <div className="max-w-[82%] min-w-0">
+        <div className="whitespace-pre-wrap rounded-2xl rounded-bl-sm border border-mist-300/80 bg-white p-3.5 text-xs leading-relaxed text-ink shadow-bubble">
           {children}
         </div>
       </div>
     </div>
   );
 }
-
-
