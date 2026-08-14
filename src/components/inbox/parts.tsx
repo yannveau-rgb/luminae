@@ -68,7 +68,7 @@ export function Avatar({
     <div
       style={style}
       className={cn(
-        'flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-ink-700 to-ink-900 font-display font-bold text-white shadow-2xs',
+        'flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-ink-700 to-ink-900 font-display font-bold text-white shadow-sm',
         className
       )}
     >
@@ -81,7 +81,7 @@ export function DayDivider({ iso }: { iso: string }) {
   return (
     <div className="my-4 flex items-center gap-3" role="separator">
       <div className="h-px flex-1 bg-mist-300/80" />
-      <span className="rounded-full border border-mist-300 bg-white px-2.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wider text-ink-400 shadow-2xs">
+      <span className="rounded-full border border-mist-300 bg-white px-2.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wider text-ink-400 shadow-sm">
         {formatDay(iso)}
       </span>
       <div className="h-px flex-1 bg-mist-300/80" />

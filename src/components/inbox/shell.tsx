@@ -588,7 +588,7 @@ export function InboxShell({
             <div>
               <p className="font-display text-lg font-bold text-ink">Sélectionnez une conversation</p>
               <p className="mt-1 text-xs text-ink-500 max-w-sm leading-relaxed">
-                Utilisez les touches <kbd className="rounded border border-mist-300 bg-white px-1.5 py-0.5 text-[11px] font-mono shadow-2xs">J</kbd> et <kbd className="rounded border border-mist-300 bg-white px-1.5 py-0.5 text-[11px] font-mono shadow-2xs">K</kbd> pour naviguer rapidement.
+                Utilisez les touches <kbd className="rounded border border-mist-300 bg-white px-1.5 py-0.5 text-[11px] font-mono shadow-sm">J</kbd> et <kbd className="rounded border border-mist-300 bg-white px-1.5 py-0.5 text-[11px] font-mono shadow-sm">K</kbd> pour naviguer rapidement.
               </p>
             </div>
           </div>

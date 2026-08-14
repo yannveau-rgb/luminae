@@ -319,7 +319,7 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
       {/* ── Section Centrale : Fil de discussion & Composeur ───────────────── */}
       <section className="flex min-w-0 flex-1 flex-col bg-mist">
         {/* En-tête de commande haute précision */}
-        <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-mist-300/80 bg-white px-4 py-3 md:px-6 shadow-2xs">
+        <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-mist-300/80 bg-white px-4 py-3 md:px-6 shadow-sm">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <Link
               href="/inbox"
@@ -508,7 +508,7 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
                         {copilotSources.map((s) => (
                           <span
                             key={s.id}
-                            className="inline-flex items-center gap-1 rounded-lg border border-mist-300 bg-white px-2 py-0.5 text-[11px] text-ink-700 shadow-2xs font-medium"
+                            className="inline-flex items-center gap-1 rounded-lg border border-mist-300 bg-white px-2 py-0.5 text-[11px] text-ink-700 shadow-sm font-medium"
                           >
                             📖 {s.title}
                           </span>
@@ -562,7 +562,7 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
                   onClick={() => setNoteMode(false)}
                   className={cn(
                     'rounded-xl px-3 py-1.5 text-xs font-semibold transition',
-                    !noteMode ? 'bg-ink text-white shadow-2xs' : 'text-ink-500 hover:bg-mist'
+                    !noteMode ? 'bg-ink text-white shadow-sm' : 'text-ink-500 hover:bg-mist'
                   )}
                 >
                   Répondre au client
@@ -571,7 +571,7 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
                   onClick={() => setNoteMode(true)}
                   className={cn(
                     'flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-semibold transition',
-                    noteMode ? 'bg-sun-600 text-white shadow-2xs' : 'text-ink-500 hover:bg-mist'
+                    noteMode ? 'bg-sun-600 text-white shadow-sm' : 'text-ink-500 hover:bg-mist'
                   )}
                 >
                   <span>🔒</span>
@@ -741,7 +741,7 @@ function MessageRow({
           'group relative max-w-[72%] rounded-2xl p-3.5 text-xs leading-relaxed shadow-bubble',
           isAgent && 'rounded-br-xs bg-lagoon-600 text-white',
           isNote && 'rounded-br-xs border border-sun-300/80 bg-sun-50 text-ink shadow-sm',
-          isBot && 'rounded-bl-xs border border-aurora-300/70 bg-white text-ink shadow-2xs',
+          isBot && 'rounded-bl-xs border border-aurora-300/70 bg-white text-ink shadow-sm',
           m.sender === 'visitor' && 'rounded-bl-xs border border-mist-300 bg-white text-ink'
         )}
       >
