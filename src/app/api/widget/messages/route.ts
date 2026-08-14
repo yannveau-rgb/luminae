@@ -99,6 +99,12 @@ export async function POST(req: Request) {
     await broadcast(`conv:${conv.id}`, 'message:new', msg);
     await broadcast(`conv:${conv.id}`, 'conversation:update', { id: conv.id, status: conv.status });
 
+    // Tout message du visiteur rafraîchit la boîte de réception. L'ancienne
+    // version ne le faisait que pour les conversations déjà escaladées : le
+    // compteur de non-lus (migration 0012) et le dernier message ne bougeaient
+    // donc pas en direct pendant la phase bot.
+    await broadcast('inbox:all', 'inbox:update', { conversation_id: conv.id });
+
     if (conv.status === 'bot') {
       // Le moteur bot répond (ou escalade). Réponse et statut arrivent au widget
       // via Realtime (il est déjà abonné grâce à l'id fourni). Une panne du bot ne
@@ -111,7 +117,6 @@ export async function POST(req: Request) {
       }
     } else {
       // Déjà escaladée : notifier l'agent assigné ou toute l'équipe.
-      await broadcast('inbox:all', 'inbox:update', { conversation_id: conv.id });
       await notifyAgents({
         type: 'new_message',
         title: 'Nouveau message du visiteur',

@@ -124,6 +124,10 @@ export default function WidgetPage() {
   const [realtimeToken, setRealtimeToken] = useState<string | null>(null);
   /** La conversation existe-t-elle côté serveur (au moins un message envoyé) ? */
   const [conversationStarted, setConversationStarted] = useState(false);
+  /** Prénom du visiteur, s'il a bien voulu le donner. */
+  const [visitorName, setVisitorName] = useState<string | null>(null);
+  const [nameDraft, setNameDraft] = useState('');
+  const [nameDismissed, setNameDismissed] = useState(false);
 
   const tokenRef = useRef<string>(getVisitorToken());
   const contextRef = useRef<VisitorContext>({ url: '', os: '', browser: '', device_type: '' });
@@ -159,6 +163,7 @@ export default function WidgetPage() {
         // s'abonner avant le premier message sans choisir soi-même une clé.
         if (data.conversationId) setConversationId(data.conversationId);
         setRealtimeToken(data.realtimeToken ?? null);
+        setVisitorName(data.visitorName ?? null);
         if (data.conversation) {
           setConversationStarted(true);
           setStatus(data.conversation.status);
@@ -293,6 +298,27 @@ export default function WidgetPage() {
     },
     [conversationId, realtimeToken, sending, scrollBottom]
   );
+
+  /** Enregistre le prénom donné par le visiteur. */
+  const submitName = useCallback(async () => {
+    const proposed = nameDraft.trim();
+    if (!proposed) return;
+    // Optimiste : le champ disparaît immédiatement, un échec le ramène.
+    setVisitorName(proposed);
+    try {
+      const res = await fetch('/api/widget/identify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: tokenRef.current, name: proposed })
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      if (data.visitorName) setVisitorName(data.visitorName);
+      setNameDraft('');
+    } catch {
+      setVisitorName(null);
+    }
+  }, [nameDraft]);
 
   const vote = useCallback(
     async (messageId: string, value: 'up' | 'down') => {
@@ -560,6 +586,49 @@ export default function WidgetPage() {
           <p className="mb-2 text-center text-[12px] font-medium text-sun-600">
             Un agent va prendre le relais — vous pouvez ajouter des précisions.
           </p>
+        )}
+
+        {/* Prénom demandé seulement une fois un humain impliqué : pendant la
+            phase bot, la question serait un péage inutile à l'entrée. Refusable
+            — l'échange continue sans, la conversation reste anonyme. */}
+        {(status === 'waiting' || status === 'assigned') && !visitorName && !nameDismissed && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              submitName();
+            }}
+            className="mb-2 rounded-xl border border-mist-300 bg-mist-50 px-3 py-2.5"
+          >
+            <label htmlFor="luminae-prenom" className="block text-[12px] font-medium text-ink-700">
+              Votre prénom, pour que l’équipe sache à qui elle répond
+            </label>
+            <div className="mt-1.5 flex items-center gap-1.5">
+              <input
+                id="luminae-prenom"
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                maxLength={60}
+                autoComplete="given-name"
+                placeholder="Prénom"
+                className="min-w-0 flex-1 rounded-lg border border-mist-300 bg-white px-2.5 py-1.5 text-[13px] outline-none transition focus:border-lagoon-400"
+              />
+              <button
+                type="submit"
+                disabled={!nameDraft.trim()}
+                className="shrink-0 rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white transition disabled:opacity-40"
+                style={{ background: accent }}
+              >
+                Valider
+              </button>
+              <button
+                type="button"
+                onClick={() => setNameDismissed(true)}
+                className="shrink-0 rounded-lg px-2 py-1.5 text-[12px] font-medium text-ink-500 transition hover:bg-mist"
+              >
+                Plus tard
+              </button>
+            </div>
+          </form>
         )}
         <div className="flex items-end gap-2">
           <textarea

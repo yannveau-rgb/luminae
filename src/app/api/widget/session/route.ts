@@ -113,6 +113,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       visitorId: visitor.id,
+      visitorName: visitor.display_name,
       settings,
       conversation: active,
       messages,

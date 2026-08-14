@@ -30,6 +30,8 @@ export const WIDGET_RULES = {
   escalate: { action: 'escalate', limit: 10, windowSeconds: 600 },
   /** Vote 👍/👎 sur une réponse du bot. */
   feedback: { action: 'feedback', limit: 30, windowSeconds: 600 },
+  /** Enregistrement du prénom du visiteur. */
+  identify: { action: 'identify', limit: 10, windowSeconds: 600 },
   /** Indicateur de saisie : relayé souvent, throttlé côté client. */
   typing: { action: 'typing', limit: 120, windowSeconds: 600 }
 } as const satisfies Record<string, RateRule>;
