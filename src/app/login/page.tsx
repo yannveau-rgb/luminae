@@ -36,7 +36,7 @@ function messageErreur(err: { message?: string; status?: number; code?: string }
 export default function LoginPage() {
   const router = useRouter();
   const supabase = supabaseBrowser();
-  const [mode, setMode] = useState<'login' | 'forgot' | 'reset'>('login');
+  const [mode, setMode] = useState<'login' | 'magic' | 'forgot' | 'reset'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -69,6 +69,24 @@ export default function LoginPage() {
     }
     router.replace('/inbox');
     router.refresh();
+  }
+
+  async function submitMagicLink(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+    const redirectUrl = `${window.location.origin}/inbox`;
+    const { error: err } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: redirectUrl }
+    });
+    setBusy(false);
+    if (err) {
+      setError(messageErreur(err));
+      return;
+    }
+    setSuccess('Un lien de connexion directe a été envoyé à votre adresse e-mail.');
   }
 
   async function submitForgot(e: React.FormEvent) {
@@ -110,14 +128,22 @@ export default function LoginPage() {
 
         <div className="rounded-2xl bg-white p-7 shadow-panel">
           <h1 className="font-display text-lg font-semibold">
-            {mode === 'login' ? 'Espace agent' : mode === 'forgot' ? 'Mot de passe oublié' : 'Nouveau mot de passe'}
+            {mode === 'login'
+              ? 'Espace agent'
+              : mode === 'magic'
+                ? 'Lien de connexion direct'
+                : mode === 'forgot'
+                  ? 'Mot de passe oublié'
+                  : 'Nouveau mot de passe'}
           </h1>
           <p className="mt-1 text-sm text-ink-500">
             {mode === 'login'
               ? 'Connectez-vous pour accéder à la boîte de réception.'
-              : mode === 'forgot'
-                ? 'Recevez un lien par e-mail pour redéfinir votre mot de passe.'
-                : 'Choisissez un nouveau mot de passe sécurisé.'}
+              : mode === 'magic'
+                ? 'Recevez un lien par e-mail pour vous connecter en un clic sans mot de passe.'
+                : mode === 'forgot'
+                  ? 'Recevez un lien par e-mail pour redéfinir votre mot de passe.'
+                  : 'Choisissez un nouveau mot de passe sécurisé.'}
           </p>
 
           {mode === 'login' && (
@@ -168,6 +194,60 @@ export default function LoginPage() {
                 className="w-full rounded-xl bg-lagoon-600 py-2.5 text-sm font-semibold text-white transition hover:bg-lagoon-700 disabled:opacity-50"
               >
                 {busy ? 'Connexion…' : 'Se connecter'}
+              </button>
+
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    setSuccess(null);
+                    setMode('magic');
+                  }}
+                  className="text-xs text-ink-500 hover:text-lagoon-600 hover:underline"
+                >
+                  ✨ Se connecter sans mot de passe (lien direct)
+                </button>
+              </div>
+            </form>
+          )}
+
+          {mode === 'magic' && (
+            <form onSubmit={submitMagicLink} className="mt-5 space-y-3">
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-ink-600">E-mail de votre compte agent</span>
+                <input
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-xl border border-mist-300 px-3.5 py-2.5 text-sm outline-none transition focus:border-lagoon-400"
+                  placeholder="vous@exemple.fr"
+                />
+              </label>
+
+              {error && <p className="rounded-lg bg-coral-50 px-3 py-2 text-xs text-coral-600">{error}</p>}
+              {success && <p className="rounded-lg bg-lagoon-50 px-3 py-2 text-xs text-lagoon-700">{success}</p>}
+
+              <button
+                type="submit"
+                disabled={busy}
+                className="w-full rounded-xl bg-lagoon-600 py-2.5 text-sm font-semibold text-white transition hover:bg-lagoon-700 disabled:opacity-50"
+              >
+                {busy ? 'Envoi…' : 'Envoyer le lien magique'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setSuccess(null);
+                  setMode('login');
+                }}
+                className="w-full text-center text-xs text-ink-500 hover:text-ink hover:underline"
+              >
+                Retour à la connexion par mot de passe
               </button>
             </form>
           )}
