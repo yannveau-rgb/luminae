@@ -148,9 +148,17 @@ export async function POST(req: Request) {
     // Statut à jour (l'escalade a pu passer la conversation en « waiting »).
     const { data: fresh } = await db.from('conversations').select('id, status').eq('id', conv.id).single();
 
+    const { data: latestMsgs } = await db
+      .from('messages')
+      .select('*')
+      .eq('conversation_id', conv.id)
+      .neq('internal_note', true)
+      .order('created_at', { ascending: true });
+
     return NextResponse.json({
       conversationId: conv.id,
-      status: fresh?.status ?? conv.status
+      status: fresh?.status ?? conv.status,
+      messages: latestMsgs ?? [msg]
     });
   } catch (err: any) {
     console.error('[widget/messages]', err);

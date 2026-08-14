@@ -112,6 +112,7 @@ export default function WidgetPage() {
   const [erasing, setErasing] = useState(false);
 
   const tokenRef = useRef<string>(getVisitorToken());
+  const accessTokenRef = useRef<string | null>(null);
   const contextRef = useRef<VisitorContext>({ url: '', os: '', browser: '', device_type: '' });
   const endRef = useRef<HTMLDivElement>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -119,6 +120,26 @@ export default function WidgetPage() {
 
   const scrollBottom = useCallback(() => {
     requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }));
+  }, []);
+
+  const refreshMessages = useCallback(async () => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (accessTokenRef.current) {
+      headers['Authorization'] = `Bearer ${accessTokenRef.current}`;
+    }
+    try {
+      const res = await fetch('/api/widget/session', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ token: tokenRef.current, context: contextRef.current })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.messages) setMessages(data.messages);
+        if (data.feedback) setFeedbacks(data.feedback);
+        if (data.conversation?.status) setStatus(data.conversation.status);
+      }
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -133,6 +154,10 @@ export default function WidgetPage() {
       if (!session) {
         const { data } = await supabase.auth.signInAnonymously().catch(() => ({ data: { session: null } }));
         session = data?.session ?? null;
+      }
+
+      if (session?.access_token) {
+        accessTokenRef.current = session.access_token;
       }
 
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -168,6 +193,7 @@ export default function WidgetPage() {
     };
   }, []);
 
+  // Temps réel conversationnel avec écoute privée et token
   useEffect(() => {
     if (!conversationId) return;
     const supabase = supabaseBrowser();
@@ -178,6 +204,7 @@ export default function WidgetPage() {
       const { data } = await supabase.auth.getSession();
       const accessToken = data.session?.access_token;
       if (accessToken) {
+        accessTokenRef.current = accessToken;
         await supabase.realtime.setAuth(accessToken);
       }
       if (disposed) return;
@@ -217,6 +244,17 @@ export default function WidgetPage() {
     };
   }, [conversationId, scrollBottom]);
 
+  // Synchronisation continue réactive : garantit la réception des réponses humaines et du bot
+  useEffect(() => {
+    if (phase !== 'ready') return;
+    // Si la conversation est active et attend une réponse humaine ou a démarré, synchroniser périodiquement
+    const intervalTime = status === 'waiting' || status === 'assigned' ? 3000 : 8000;
+    const timer = setInterval(() => {
+      refreshMessages();
+    }, intervalTime);
+    return () => clearInterval(timer);
+  }, [phase, status, refreshMessages]);
+
   useEffect(() => {
     if (phase === 'ready') scrollBottom();
   }, [phase, messages.length, scrollBottom]);
@@ -237,10 +275,15 @@ export default function WidgetPage() {
     setMessages((prev) => [...prev, optimistic]);
     scrollBottom();
 
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (accessTokenRef.current) {
+      headers['Authorization'] = `Bearer ${accessTokenRef.current}`;
+    }
+
     try {
       const res = await fetch('/api/widget/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           conversationId,
           content: text,
@@ -253,6 +296,12 @@ export default function WidgetPage() {
       if (data.conversationId && data.conversationId !== conversationId) {
         setConversationId(data.conversationId);
       }
+      if (data.status) {
+        setStatus(data.status);
+      }
+      if (Array.isArray(data.messages) && data.messages.length > 0) {
+        setMessages(data.messages);
+      }
       setConversationStarted(true);
     } catch {
       setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, failed: true } : m)));
@@ -263,10 +312,14 @@ export default function WidgetPage() {
 
   async function askHuman() {
     if (!conversationId) return;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (accessTokenRef.current) {
+      headers['Authorization'] = `Bearer ${accessTokenRef.current}`;
+    }
     try {
       const res = await fetch('/api/widget/escalate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ conversationId, token: tokenRef.current })
       });
       if (res.ok) {
@@ -277,9 +330,13 @@ export default function WidgetPage() {
 
   async function vote(messageId: string, value: 'up' | 'down') {
     setFeedbacks((prev) => ({ ...prev, [messageId]: value }));
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (accessTokenRef.current) {
+      headers['Authorization'] = `Bearer ${accessTokenRef.current}`;
+    }
     fetch('/api/widget/feedback', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ messageId, value, token: tokenRef.current })
     }).catch(() => {});
   }

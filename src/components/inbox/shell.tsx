@@ -137,15 +137,14 @@ export function InboxShell({
     };
   }, [supabase, agent.id, tab, load, selectedId, router]);
 
-  // Repli périodique sans Realtime
+  // Synchronisation continue réactive : actualise la boîte et les notifications
   useEffect(() => {
-    if (!realtimeDown) return;
     const id = setInterval(() => {
       load(tab === 'resolved');
       loadNotifs();
-    }, 15000);
+    }, 4500);
     return () => clearInterval(id);
-  }, [realtimeDown, load, loadNotifs, tab]);
+  }, [load, loadNotifs, tab]);
 
   async function logout() {
     await supabase.auth.signOut();

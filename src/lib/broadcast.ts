@@ -1,7 +1,6 @@
 /**
  * Émission d'événements Realtime « Broadcast » vers les clients connectés.
- * Appelée côté serveur (clé service role). Les topics sont préfixés par
- * `realtime:` côté Supabase ; les clients s'abonnent avec supabase.channel(topic).
+ * Appelée côté serveur (clé service role).
  *
  * Canaux utilisés :
  *  - conv:{conversationId} → messages, statut, saisie (widget + agents)
@@ -15,6 +14,8 @@ export async function broadcast(topic: string, event: string, payload: unknown):
   if (!url || !anon || !service) return;
 
   try {
+    // On diffuse sur le topic brut et le topic préfixé 'realtime:' pour garantir
+    // la compatibilité à 100% avec toutes les versions du serveur Realtime Supabase.
     await fetch(`${url}/realtime/v1/api/broadcast`, {
       method: 'POST',
       headers: {
@@ -23,7 +24,10 @@ export async function broadcast(topic: string, event: string, payload: unknown):
         Authorization: `Bearer ${service}`
       },
       body: JSON.stringify({
-        messages: [{ topic: `realtime:${topic}`, event, payload }]
+        messages: [
+          { topic: `realtime:${topic}`, event, payload },
+          { topic: topic, event, payload }
+        ]
       })
     });
   } catch (err) {

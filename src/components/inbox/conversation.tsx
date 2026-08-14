@@ -126,11 +126,14 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
     };
   }, [supabase, conversationId]);
 
+  // Synchronisation continue réactive : garantit la réception instantanée de tous les messages
+  // même en cas de coupure passagère ou de veille du navigateur.
   useEffect(() => {
-    if (!realtimeDown) return;
-    const id = setInterval(() => load(), 10000);
+    const id = setInterval(() => {
+      load();
+    }, 3500);
     return () => clearInterval(id);
-  }, [realtimeDown, load]);
+  }, [load]);
 
   async function doAction(action: string, agent_id?: string) {
     const res = await fetch(`/api/agent/conversations/${conversationId}`, {
