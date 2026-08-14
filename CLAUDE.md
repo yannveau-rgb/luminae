@@ -218,11 +218,11 @@ refuse pendant quelques minutes — y compris avec le bon mot de passe. C'est
 indistinguable d'un mauvais mot de passe sans lire le statut de l'erreur, d'où la
 fonction `messageErreur()` de la page de connexion.
 
-L'application n'ayant pas encore de flux de réinitialisation, un mot de passe se
-redéfinit depuis Authentication → Users → ⋮ → *Reset password*.
+La gestion de l'équipe (création d'agents/admins et suppression sécurisée) s'effectue directement depuis l'espace d'administration (`/admin?tab=team`) sans manipulation manuelle de la base de données.
 
-Comptes administrateurs actuels : `yann.veau@evaluo.eu` et
-`yann.veau@gmail.com`, tous deux liés à leur `auth_user_id`.
+La réinitialisation de mot de passe est accessible en self-service sur `/login` via le lien « Oublié ? », ou par lien magique de connexion directe.
+
+Comptes administrateurs actuels : `yann.veau@evaluo.eu` et `yann.veau@gmail.com`, tous deux liés à leur `auth_user_id`.
 
 ## Pièges connus
 
