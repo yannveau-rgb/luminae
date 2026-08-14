@@ -297,46 +297,53 @@ export function InboxShell({
               </button>
 
               {notifOpen && (
-                <div
-                  role="dialog"
-                  aria-label="Centre de notifications"
-                  className="absolute right-0 top-10 z-30 w-80 animate-slide-up rounded-2xl border border-mist-300 bg-white p-3 shadow-panel"
-                >
-                  <div className="flex items-center justify-between pb-2 border-b border-mist-300/60">
-                    <span className="text-xs font-bold uppercase tracking-wider text-ink">Notifications</span>
-                    {notifs.length > 0 && (
-                      <button onClick={markAllRead} className="text-xs font-semibold text-lagoon-600 hover:underline">
-                        Tout marquer lu
+                <>
+                  <div
+                    className="fixed inset-0 z-20"
+                    onClick={() => setNotifOpen(false)}
+                    aria-hidden
+                  />
+                  <div
+                    role="dialog"
+                    aria-label="Centre de notifications"
+                    className="absolute -right-16 md:-right-20 top-10 z-30 w-80 max-w-[calc(100vw-24px)] animate-slide-up rounded-2xl border border-mist-300 bg-white p-3 shadow-panel"
+                  >
+                    <div className="flex items-center justify-between pb-2 border-b border-mist-300/60">
+                      <span className="text-xs font-bold uppercase tracking-wider text-ink">Notifications</span>
+                      {notifs.length > 0 && (
+                        <button onClick={markAllRead} className="text-xs font-semibold text-lagoon-600 hover:underline">
+                          Tout marquer lu
+                        </button>
+                      )}
+                    </div>
+                    {notificationSupported() && browserPermission === 'default' && (
+                      <button
+                        onClick={enableBrowserNotifications}
+                        className="mt-2 w-full rounded-xl bg-lagoon-50 px-3 py-2 text-left text-xs font-medium text-lagoon-700 transition hover:bg-lagoon-100"
+                      >
+                        🔔 Activer les notifications du navigateur
                       </button>
                     )}
+                    {notifs.length === 0 ? (
+                      <p className="py-6 text-center text-xs text-ink-400">Aucune notification.</p>
+                    ) : (
+                      <ul className="mt-2 max-h-72 space-y-1 overflow-y-auto">
+                        {notifs.map((n) => (
+                          <li key={n.id}>
+                            <button
+                              onClick={() => openNotification(n)}
+                              className="w-full rounded-xl p-2 text-left transition hover:bg-mist-100"
+                            >
+                              <p className="text-xs font-semibold text-ink">{n.title}</p>
+                              {n.body && <p className="mt-0.5 line-clamp-2 text-xs text-ink-500">{n.body}</p>}
+                              <p className="mt-1 text-[10px] text-ink-400">{timeAgo(n.created_at)}</p>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
-                  {notificationSupported() && browserPermission === 'default' && (
-                    <button
-                      onClick={enableBrowserNotifications}
-                      className="mt-2 w-full rounded-xl bg-lagoon-50 px-3 py-2 text-left text-xs font-medium text-lagoon-700 transition hover:bg-lagoon-100"
-                    >
-                      🔔 Activer les notifications du navigateur
-                    </button>
-                  )}
-                  {notifs.length === 0 ? (
-                    <p className="py-6 text-center text-xs text-ink-400">Aucune notification.</p>
-                  ) : (
-                    <ul className="mt-2 max-h-72 space-y-1 overflow-y-auto">
-                      {notifs.map((n) => (
-                        <li key={n.id}>
-                          <button
-                            onClick={() => openNotification(n)}
-                            className="w-full rounded-xl p-2 text-left transition hover:bg-mist-100"
-                          >
-                            <p className="text-xs font-semibold text-ink">{n.title}</p>
-                            {n.body && <p className="mt-0.5 line-clamp-2 text-xs text-ink-500">{n.body}</p>}
-                            <p className="mt-1 text-[10px] text-ink-400">{timeAgo(n.created_at)}</p>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+                </>
               )}
             </div>
 
