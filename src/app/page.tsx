@@ -175,7 +175,7 @@ export default function HomePage() {
                 <div className="flex gap-3">
                   <BotOrb size={28} glow />
                   <div className="max-w-lg rounded-2xl rounded-bl-sm border border-aurora-400/40 bg-white/10 p-3.5 text-xs text-mist-100 backdrop-blur-md">
-                    <p className="font-semibold text-aurora-300 mb-1">⚡ Réponse RAG Luminae (Mistral AI) :</p>
+                    <p className="font-semibold text-aurora-300 mb-1">⚡ Réponse Lumi (Assistant IA) :</p>
                     <p>
                       Pour réinitialiser votre mot de passe, cliquez sur <em>« Mot de passe oublié »</em> sur la page de connexion.
                       Vos données sont traitées exclusivement sur des serveurs hébergés en France/UE avec chiffrement complet et conformité RGPD stricte.

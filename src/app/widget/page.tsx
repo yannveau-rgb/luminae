@@ -667,7 +667,7 @@ export default function WidgetPage() {
 
                 {m.sender === 'bot' && (
                   <div className="mt-2.5 flex items-center justify-between border-t border-mist-200/80 pt-2 text-[11px] text-ink-400">
-                    <span className="text-[10px] font-semibold text-aurora-600">RAG Luminae</span>
+                    <span className="text-[10px] font-semibold text-aurora-600">{botName}</span>
                     <div className="flex items-center gap-1.5">
                       {feedbacks[m.id] ? (
                         <span className="font-semibold text-lagoon-600">Merci pour votre retour !</span>

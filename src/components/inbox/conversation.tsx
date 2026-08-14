@@ -772,7 +772,7 @@ function MessageRow({
 
         {isBot && (
           <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-aurora-600">
-            Assistant RAG Luminae
+            Lumi · Assistant IA
           </div>
         )}
 
