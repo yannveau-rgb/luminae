@@ -56,15 +56,15 @@ export default function LoginPage() {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+    const cleanEmail = email.trim().toLowerCase();
+    const { error: err } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
     if (err) {
       console.error('[Luminae Auth] signInWithPassword error:', err);
       setError(messageErreur(err));
       setBusy(false);
       return;
     }
-    router.replace('/inbox');
-    router.refresh();
+    window.location.href = '/inbox';
   }
 
   async function submitMagicLink(e: React.FormEvent) {
@@ -72,9 +72,10 @@ export default function LoginPage() {
     setBusy(true);
     setError(null);
     setSuccess(null);
+    const cleanEmail = email.trim().toLowerCase();
     const redirectUrl = `${window.location.origin}/inbox`;
     const { error: err } = await supabase.auth.signInWithOtp({
-      email,
+      email: cleanEmail,
       options: { emailRedirectTo: redirectUrl }
     });
     setBusy(false);
@@ -361,10 +362,23 @@ export default function LoginPage() {
           )}
         </div>
 
+        {/* Reassurance Souveraineté & RGPD */}
+        <div className="mt-6 flex flex-col items-center justify-center gap-1 text-center text-[11px] text-mist-400">
+          <p className="flex items-center gap-1.5 font-medium text-mist-300">
+            <span>🇫🇷</span>
+            <span>Plateforme 100% Souveraine Made in France</span>
+            <span>·</span>
+            <span>🔒 Conforme RGPD & CNIL</span>
+          </p>
+          <p className="text-[10.5px] text-mist-400">
+            Données chiffrées hébergées exclusivement en Union Européenne.
+          </p>
+        </div>
+
         {/* Retour Accueil */}
-        <p className="mt-6 text-center text-xs text-mist-400">
+        <p className="mt-5 text-center text-xs text-mist-400">
           <Link href="/" className="transition hover:text-aurora-300">
-            &larr; Retour au site public
+            &larr; Retour à l’accueil
           </Link>
         </p>
       </div>
