@@ -4,7 +4,7 @@
 
 :root {
   /* Accent du widget — surchargé à la volée par bot_settings.accent_color */
-  --accent: #0B7A6E;
+  --accent: #0e8c7d;
 }
 
 html,
@@ -17,16 +17,11 @@ body {
   font-feature-settings: 'cv02', 'cv03';
 }
 
-::selection {
-  background: rgba(47, 198, 212, 0.3);
-  color: #081624;
-}
-
-/* Focus clavier visible & élégant */
+/* Focus clavier toujours visible */
 :focus-visible {
   outline: 2px solid var(--focus-color, #2fc6d4);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: 4px;
 }
 
 /* Barres de défilement discrètes */
@@ -35,49 +30,12 @@ body {
   scrollbar-color: #c3d1db transparent;
 }
 *::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 *::-webkit-scrollbar-thumb {
   background: #c3d1db;
-  border-radius: 6px;
-}
-
-/* Surfaces de verre dépoli & effets IA */
-.glass-panel {
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  background: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(220, 229, 235, 0.8);
-}
-
-.glass-dark {
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  background: rgba(8, 22, 36, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.glass-pill {
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-.aurora-bg {
-  background: 
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(47, 198, 212, 0.15), transparent),
-    radial-gradient(ellipse 60% 40% at 80% 20%, rgba(14, 140, 125, 0.12), transparent),
-    radial-gradient(ellipse 50% 30% at 20% 40%, rgba(47, 198, 212, 0.08), transparent);
-}
-
-.aurora-dark-bg {
-  background:
-    radial-gradient(circle 600px at 50% -10%, rgba(47, 198, 212, 0.25), transparent),
-    radial-gradient(circle 500px at 80% 20%, rgba(14, 140, 125, 0.20), transparent),
-    radial-gradient(circle 400px at 20% 60%, rgba(15, 122, 134, 0.15), transparent),
-    #081624;
+  border-radius: 8px;
 }
 
 /* Lien « souligné doux » pour le contenu riche */

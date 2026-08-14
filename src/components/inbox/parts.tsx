@@ -1,19 +1,19 @@
 'use client';
 
-/** Petits éléments partagés de la boîte de réception agent haute performance. */
+/** Petits éléments partagés de la boîte de réception agent. */
 
 import { cn, formatDay, initials } from '@/lib/utils';
 import type { ConversationStatus } from '@/lib/types';
 
 const STATUS_STYLES: Record<ConversationStatus, string> = {
-  bot: 'bg-aurora-100/80 text-aurora-600 border border-aurora-300/60',
-  waiting: 'bg-sun-100/80 text-sun-600 border border-sun-300/60',
-  assigned: 'bg-lagoon-100/80 text-lagoon-700 border border-lagoon-300/60',
-  resolved: 'bg-mist-200 text-ink-500 border border-mist-300'
+  bot: 'bg-aurora-100 text-aurora-600',
+  waiting: 'bg-sun-100 text-sun-600',
+  assigned: 'bg-lagoon-100 text-lagoon-700',
+  resolved: 'bg-mist text-ink-500'
 };
 
 const STATUS_TEXT: Record<ConversationStatus, string> = {
-  bot: 'Bot RAG',
+  bot: 'Bot',
   waiting: 'En attente',
   assigned: 'Assignée',
   resolved: 'Résolue'
@@ -23,20 +23,11 @@ export function StatusBadge({ status, className }: { status: ConversationStatus;
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold transition',
+        'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
         STATUS_STYLES[status] ?? STATUS_STYLES.resolved,
         className
       )}
     >
-      <span
-        className={cn(
-          'h-1.5 w-1.5 rounded-full shrink-0',
-          status === 'bot' && 'bg-aurora-500 animate-pulse',
-          status === 'waiting' && 'bg-sun-500',
-          status === 'assigned' && 'bg-lagoon-500',
-          status === 'resolved' && 'bg-ink-400'
-        )}
-      />
       {STATUS_TEXT[status] ?? status}
     </span>
   );
@@ -55,20 +46,13 @@ export function Avatar({
 }) {
   const style = { width: size, height: size };
   if (url) {
-    return (
-      <img
-        src={url}
-        alt={name ?? 'Avatar'}
-        style={style}
-        className={cn('shrink-0 rounded-full object-cover ring-1 ring-black/5', className)}
-      />
-    );
+    return <img src={url} alt={name ?? 'Avatar'} style={style} className={cn('shrink-0 rounded-full object-cover', className)} />;
   }
   return (
     <div
       style={style}
       className={cn(
-        'flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-ink-700 to-ink-900 font-display font-bold text-white shadow-sm',
+        'flex shrink-0 items-center justify-center rounded-full bg-ink-700 font-display text-white',
         className
       )}
     >
@@ -79,12 +63,10 @@ export function Avatar({
 
 export function DayDivider({ iso }: { iso: string }) {
   return (
-    <div className="my-4 flex items-center gap-3" role="separator">
-      <div className="h-px flex-1 bg-mist-300/80" />
-      <span className="rounded-full border border-mist-300 bg-white px-2.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wider text-ink-400 shadow-sm">
-        {formatDay(iso)}
-      </span>
-      <div className="h-px flex-1 bg-mist-300/80" />
+    <div className="my-3 flex items-center gap-3" role="separator">
+      <div className="h-px flex-1 bg-mist-300" />
+      <span className="text-[11px] font-medium uppercase tracking-wide text-ink-400">{formatDay(iso)}</span>
+      <div className="h-px flex-1 bg-mist-300" />
     </div>
   );
 }
@@ -92,7 +74,7 @@ export function DayDivider({ iso }: { iso: string }) {
 export function UnreadBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
-    <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-coral-500 px-1 text-[10px] font-bold text-white shadow-glow-sm">
+    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-coral px-1.5 text-[11px] font-semibold text-white">
       {count > 99 ? '99+' : count}
     </span>
   );

@@ -26,10 +26,12 @@ export async function POST(req: Request) {
 
     const rapport = await eraseVisitor(token);
     if (!rapport) {
-      // Rien à effacer : réponse identique au succès, pour ne pas révéler
-      // si un token existe ou non.
       return NextResponse.json({ ok: true, conversations: 0 });
     }
+
+    // Notifier la boîte de réception pour actualiser la liste des agents
+    const { broadcast } = await import('@/lib/broadcast');
+    await broadcast('inbox:all', 'inbox:update', {});
 
     return NextResponse.json({ ok: true, conversations: rapport.conversations });
   } catch (err) {

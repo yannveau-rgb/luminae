@@ -359,10 +359,14 @@ export default function WidgetPage() {
       return;
     }
     setErasing(true);
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (accessTokenRef.current) {
+      headers['Authorization'] = `Bearer ${accessTokenRef.current}`;
+    }
     try {
-      await fetch('/api/widget/gdpr-erasure', {
+      await fetch('/api/widget/erase', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ token: tokenRef.current })
       });
       try {
