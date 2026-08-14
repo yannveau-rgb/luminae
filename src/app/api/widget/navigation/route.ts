@@ -49,9 +49,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, unchanged: true });
     }
 
-    const cleanPath = parsedUrl.pathname + (parsedUrl.search || '');
     const cleanTitle = (title || '').trim();
-    const eventText = `🧭 Page consultée : ${cleanPath}${cleanTitle ? ` · « ${cleanTitle} »` : ''}`;
+    const eventText = cleanTitle
+      ? `🧭 Page consultée : ${url} · « ${cleanTitle} »`
+      : `🧭 Page consultée : ${url}`;
 
     // 1. Mettre à jour l'URL source sur la conversation
     await db

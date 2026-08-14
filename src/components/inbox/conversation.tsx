@@ -824,14 +824,46 @@ function MessageRow({
   onMakeArticle?: (m: Message) => void;
 }) {
   if (m.sender === 'system') {
-    const isNav = m.content.startsWith('🧭');
+    const isNav = m.content.startsWith('🧭') || m.content.includes('Page consultée');
+    const urlMatch = m.content.match(/https?:\/\/[^\s·«"]+/) || m.content.match(/\/[a-zA-Z0-9_\-./?&=#%]+/);
+    const targetUrl = urlMatch ? urlMatch[0] : null;
+
+    if (isNav && targetUrl) {
+      return (
+        <div className="my-2.5 flex justify-center animate-fade-in">
+          <a
+            href={targetUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={`Ouvrir la page consultée par le visiteur dans un nouvel onglet : ${targetUrl}`}
+            className="group inline-flex max-w-[90%] items-center gap-1.5 rounded-full border border-lagoon-300 bg-lagoon-50 px-3.5 py-1 text-[11px] font-semibold text-lagoon-700 shadow-sm transition hover:bg-lagoon-100 hover:border-lagoon-400"
+          >
+            <span>🧭</span>
+            <span>Page consultée :</span>
+            <span className="truncate font-mono underline underline-offset-2">{targetUrl}</span>
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="shrink-0 opacity-70 group-hover:opacity-100"
+            >
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" />
+            </svg>
+          </a>
+        </div>
+      );
+    }
+
     return (
       <div className="my-2.5 flex justify-center">
         <span
           className={cn(
             'inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-[11px] font-medium shadow-sm transition',
             isNav
-              ? 'border border-lagoon-300/80 bg-lagoon-50 text-lagoon-700 font-semibold'
+              ? 'border border-lagoon-300 bg-lagoon-50 text-lagoon-700 font-semibold'
               : 'border border-mist-300 bg-white text-ink-500'
           )}
         >

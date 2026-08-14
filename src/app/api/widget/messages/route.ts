@@ -106,6 +106,26 @@ export async function POST(req: Request) {
       if (!created) return NextResponse.json({ error: 'La conversation n’a pas pu être créée.' }, { status: 500 });
       conv = created;
       await broadcast('inbox:all', 'inbox:update', { conversation_id: conv.id });
+    } else if (context?.url && conv.source_url && conv.source_url !== context.url) {
+      // Le visiteur a navigué vers une nouvelle page depuis son dernier message
+      const newUrl = context.url.slice(0, 1000);
+      await db.from('conversations').update({ source_url: newUrl, updated_at: new Date().toISOString() }).eq('id', conv.id);
+      conv.source_url = newUrl;
+
+      const { data: navMsg } = await db
+        .from('messages')
+        .insert({
+          conversation_id: conv.id,
+          sender: 'system',
+          content: `🧭 Page consultée : ${newUrl}`
+        })
+        .select('*')
+        .single();
+
+      if (navMsg) {
+        await broadcast(`conv:${conv.id}`, 'message:new', navMsg);
+      }
+      await broadcast(`conv:${conv.id}`, 'conversation:update', { id: conv.id, source_url: newUrl });
     }
 
     // Insérer le message visiteur.
