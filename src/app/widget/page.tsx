@@ -18,6 +18,7 @@ import {
   ThumbIcon,
   TypingDots
 } from '@/components/widget/parts';
+import { playVisitorMessageSound } from '@/lib/browser-notify';
 
 interface UiAttachment {
   id: string;
@@ -110,13 +111,19 @@ export default function WidgetPage() {
   const [nameDraft, setNameDraft] = useState('');
   const [nameDismissed, setNameDismissed] = useState(false);
   const [erasing, setErasing] = useState(false);
+  const [soundMuted, setSoundMuted] = useState(false);
 
   const tokenRef = useRef<string>(getVisitorToken());
   const accessTokenRef = useRef<string | null>(null);
+  const soundMutedRef = useRef(false);
   const contextRef = useRef<VisitorContext>({ url: '', os: '', browser: '', device_type: '' });
   const endRef = useRef<HTMLDivElement>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingSent = useRef(0);
+
+  useEffect(() => {
+    soundMutedRef.current = soundMuted;
+  }, [soundMuted]);
 
   const scrollBottom = useCallback(() => {
     requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }));
@@ -135,7 +142,18 @@ export default function WidgetPage() {
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.messages) setMessages(data.messages);
+        if (data.messages) {
+          setMessages((prev) => {
+            // Détection de nouveaux messages arrivés depuis le dernier check
+            if (data.messages.length > prev.length) {
+              const last = data.messages[data.messages.length - 1];
+              if ((last?.sender === 'bot' || last?.sender === 'agent') && !soundMutedRef.current) {
+                playVisitorMessageSound();
+              }
+            }
+            return data.messages;
+          });
+        }
         if (data.feedback) setFeedbacks(data.feedback);
         if (data.conversation?.status) setStatus(data.conversation.status);
       }
@@ -193,6 +211,34 @@ export default function WidgetPage() {
     };
   }, []);
 
+  // Écoute des changements de page sur le site hôte (intégration HubSpot style)
+  useEffect(() => {
+    const onHostMessage = (e: MessageEvent) => {
+      if (!e.data) return;
+      if (e.data.type === 'luminae:init' || e.data.type === 'luminae:navigation') {
+        const href = typeof e.data.href === 'string' ? e.data.href : '';
+        const title = typeof e.data.title === 'string' ? e.data.title : '';
+        if (href) {
+          contextRef.current.url = href;
+          if (conversationId && conversationStarted) {
+            fetch('/api/widget/navigation', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                token: tokenRef.current,
+                conversationId,
+                url: href,
+                title
+              })
+            }).catch(() => {});
+          }
+        }
+      }
+    };
+    window.addEventListener('message', onHostMessage);
+    return () => window.removeEventListener('message', onHostMessage);
+  }, [conversationId, conversationStarted]);
+
   // Temps réel conversationnel avec écoute privée et token
   useEffect(() => {
     if (!conversationId) return;
@@ -220,6 +266,10 @@ export default function WidgetPage() {
                 const copy = [...prev];
                 copy[idx] = msg;
                 return copy;
+              }
+            } else if (msg.sender === 'bot' || msg.sender === 'agent') {
+              if (!soundMutedRef.current) {
+                playVisitorMessageSound();
               }
             }
             return [...prev, msg];
@@ -483,6 +533,23 @@ export default function WidgetPage() {
           )}
 
           <button
+            onClick={() => setSoundMuted((m) => !m)}
+            aria-label={soundMuted ? 'Activer le son' : 'Couper le son'}
+            title={soundMuted ? 'Activer le son' : 'Couper le son'}
+            className="flex h-8 w-8 items-center justify-center rounded-xl text-ink-400 transition hover:bg-mist hover:text-ink"
+          >
+            {soundMuted ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M11 5L6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6" />
+              </svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M11 5L6 9H2v6h4l5 4V5zM19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+              </svg>
+            )}
+          </button>
+
+          <button
             onClick={() => window.location.reload()}
             aria-label="Recommencer la conversation"
             title="Recommencer"
@@ -534,9 +601,16 @@ export default function WidgetPage() {
 
           {messages.map((m) => {
             if (m.sender === 'system') {
+              const isNav = m.content.startsWith('🧭');
               return (
                 <div key={m.id} className="animate-fade-in flex justify-center my-2">
-                  <span className="rounded-full bg-mist-200/80 px-3 py-1 text-center text-[11px] font-medium text-ink-500">
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-center text-[10.5px] font-medium transition ${
+                      isNav
+                        ? 'border border-lagoon-300/80 bg-lagoon-50 text-lagoon-700 font-semibold shadow-sm'
+                        : 'bg-mist-200/80 text-ink-500'
+                    }`}
+                  >
                     {m.content}
                   </span>
                 </div>

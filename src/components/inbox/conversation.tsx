@@ -10,6 +10,7 @@ import { cn, formatDay, formatTime, timeAgo } from '@/lib/utils';
 import type { Agent, Attachment, Conversation, Message, Visitor } from '@/lib/types';
 import { Avatar, DayDivider, StatusBadge } from './parts';
 import { Composer, type ComposerHandle, type PendingAttachment } from './composer';
+import { playAgentNotificationSound } from '@/lib/browser-notify';
 
 interface TeamMember {
   id: string;
@@ -92,7 +93,13 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
 
     const append = (payload: Message) => {
       if (!payload?.id) return;
-      setMessages((ms) => (ms.some((m) => m.id === payload.id) ? ms : [...ms, payload]));
+      setMessages((ms) => {
+        if (ms.some((m) => m.id === payload.id)) return ms;
+        if (payload.sender === 'visitor') {
+          playAgentNotificationSound();
+        }
+        return [...ms, payload];
+      });
     };
 
     (async () => {
@@ -716,9 +723,17 @@ function MessageRow({
   onMakeArticle?: (m: Message) => void;
 }) {
   if (m.sender === 'system') {
+    const isNav = m.content.startsWith('🧭');
     return (
-      <div className="my-2 flex justify-center">
-        <span className="rounded-full bg-mist-200/80 px-3 py-0.5 text-[11px] font-medium text-ink-500">
+      <div className="my-2.5 flex justify-center">
+        <span
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-[11px] font-medium shadow-sm transition',
+            isNav
+              ? 'border border-lagoon-300/80 bg-lagoon-50 text-lagoon-700 font-semibold'
+              : 'border border-mist-300 bg-white text-ink-500'
+          )}
+        >
           {m.content}
         </span>
       </div>

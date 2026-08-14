@@ -7,8 +7,8 @@
  *
  * Injecte un bouton flottant qui ouvre le widget de chat (/widget) dans une
  * iframe. La page hôte n'est jamais bloquée : tout est créé dynamiquement et
- * l'URL de la page courante est transmise au widget via postMessage
- * (message « luminae:init », écouté par /widget pour le contexte visiteur).
+ * l'URL de la page courante et ses changements (navigation SPA / HubSpot style)
+ * sont transmis au widget via postMessage en temps réel.
  */
 (function () {
   'use strict';
@@ -26,6 +26,7 @@
 
   var accent = (script && script.getAttribute('data-accent')) || '#0B7A6E';
   var isOpen = false;
+  var lastUrl = window.location.href;
 
   // ── Styles (portée limitée via id dédiés, z-index élevé) ──────────────────
   var style = document.createElement('style');
@@ -35,8 +36,8 @@
     'display:flex;align-items:center;justify-content:center;transition:transform .15s ease,opacity .15s ease}' +
     '#luminae-launcher:hover{transform:scale(1.06)}' +
     '#luminae-launcher svg{width:26px;height:26px}' +
-    '#luminae-frame{position:fixed;bottom:88px;right:20px;width:384px;height:600px;max-width:calc(100vw - 40px);' +
-    'max-height:calc(100vh - 120px);border:0;border-radius:16px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.22);' +
+    '#luminae-frame{position:fixed;bottom:88px;right:20px;width:390px;height:640px;max-width:calc(100vw - 40px);' +
+    'max-height:calc(100vh - 120px);border:0;border-radius:24px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.22);' +
     'z-index:2147483000;background:#fff;opacity:0;transform:translateY(12px) scale(.98);pointer-events:none;' +
     'transition:opacity .18s ease,transform .18s ease}' +
     '#luminae-frame.luminae-open{opacity:1;transform:none;pointer-events:auto}' +
@@ -64,26 +65,64 @@
   function sendInit() {
     try {
       frame.contentWindow.postMessage(
-        { type: 'luminae:init', href: window.location.href },
+        { type: 'luminae:init', href: window.location.href, title: document.title },
         base
       );
-    } catch (e) {
-      /* origine croisée : ignorer */
+    } catch (e) {}
+  }
+
+  function sendNavigation(href, title) {
+    try {
+      frame.contentWindow.postMessage(
+        { type: 'luminae:navigation', href: href, title: title || document.title },
+        base
+      );
+    } catch (e) {}
+  }
+
+  function checkUrlChange() {
+    if (window.location.href !== lastUrl) {
+      lastUrl = window.location.href;
+      sendNavigation(lastUrl, document.title);
     }
   }
+
+  // Surveillance des changements d'URL (SPA, pushState, popState, hashChange)
+  var origPushState = history.pushState;
+  if (origPushState) {
+    history.pushState = function () {
+      origPushState.apply(this, arguments);
+      setTimeout(checkUrlChange, 60);
+    };
+  }
+
+  var origReplaceState = history.replaceState;
+  if (origReplaceState) {
+    history.replaceState = function () {
+      origReplaceState.apply(this, arguments);
+      setTimeout(checkUrlChange, 60);
+    };
+  }
+
+  window.addEventListener('popstate', checkUrlChange);
+  window.addEventListener('hashchange', checkUrlChange);
+  setInterval(checkUrlChange, 1500);
 
   function toggle() {
     isOpen = !isOpen;
     frame.classList.toggle('luminae-open', isOpen);
     launcher.innerHTML = isOpen ? ICON_CLOSE : ICON_CHAT;
     launcher.setAttribute('aria-label', isOpen ? 'Fermer le chat' : 'Ouvrir le chat');
-    if (isOpen) sendInit();
+    if (isOpen) {
+      sendInit();
+      sendNavigation(window.location.href, document.title);
+    }
   }
 
   launcher.addEventListener('click', toggle);
-  // Renvoyer l'init dès que l'iframe est prête (au cas où déjà ouverte).
   frame.addEventListener('load', function () {
-    if (isOpen) sendInit();
+    sendInit();
+    if (isOpen) sendNavigation(window.location.href, document.title);
   });
 
   function mount() {
