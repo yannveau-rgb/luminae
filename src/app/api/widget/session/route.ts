@@ -121,10 +121,9 @@ export async function POST(req: Request) {
       }
     }
 
-    // Identifiant du canal Realtime. S'il n'y a pas de conversation active, on
-    // en pré-alloue un côté serveur : le widget peut ainsi s'abonner AVANT
-    // d'envoyer son premier message (sinon il raterait la réponse du bot), sans
-    // que le client ait à choisir lui-même une clé primaire.
+    // Identifiant du canal Realtime
+    const conversationId = active?.id ?? randomUUID();
+
     // Configuration téléphonie & Quicktalk
     const store = (s?.suggestions && typeof s.suggestions === 'object' && !Array.isArray(s.suggestions))
       ? (s.suggestions as Record<string, unknown>)
