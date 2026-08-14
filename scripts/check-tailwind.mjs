@@ -23,7 +23,17 @@ const VALID_COLORS = {
   mist: new Set(['DEFAULT', '600', '500', '400', '300', '200', '100', '50'])
 };
 
-const VALID_SHADOWS = new Set(['panel', 'bubble', 'glow-sm', 'glow', 'halo']);
+const VALID_SHADOWS = new Set([
+  'panel',
+  'bubble',
+  'glow-sm',
+  'glow',
+  'glow-lg',
+  'glow-aurora',
+  'halo',
+  'card-hover',
+  'card-dark'
+]);
 
 function getFiles(dir) {
   const entries = readdirSync(dir);

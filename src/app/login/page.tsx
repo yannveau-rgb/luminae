@@ -1,6 +1,6 @@
 'use client';
 
-/** Connexion agent/admin — Supabase Auth (e-mail + mot de passe). */
+/** Connexion agent/admin — Supabase Auth (e-mail + mot de passe ou lien direct). */
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -8,24 +8,16 @@ import Link from 'next/link';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { BotOrb } from '@/components/widget/parts';
 
-/**
- * Traduit l'échec d'authentification en message utile.
- *
- * Un message unique « identifiants invalides » couvrait auparavant tous les cas,
- * y compris ceux où le mot de passe est correct : e-mail non confirmé, compte
- * suspendu, ou limitation de débit après plusieurs tentatives. L'agent cherchait
- * alors une faute qui n'existait pas (constat U-10).
- */
 function messageErreur(err: { message?: string; status?: number; code?: string }): string {
   const status = err.status ?? 0;
   const code = (err.code ?? '').toLowerCase();
   const texte = (err.message ?? '').toLowerCase();
 
   if (status === 429 || code.includes('rate') || texte.includes('rate limit')) {
-    return 'Trop de tentatives — Supabase a temporairement bloqué les connexions pour ce compte. Patientez quelques minutes avant de réessayer, même avec le bon mot de passe.';
+    return 'Trop de tentatives — Supabase a temporairement bloqué les connexions pour ce compte. Patientez quelques minutes avant de réessayer.';
   }
   if (code.includes('email_not_confirmed') || texte.includes('not confirmed')) {
-    return 'Cette adresse n’est pas encore confirmée. Ouvrez le lien reçu par e-mail, ou demandez à un administrateur de confirmer le compte.';
+    return 'Cette adresse n’est pas encore confirmée. Ouvrez le lien reçu par e-mail.';
   }
   if (texte.includes('banned') || texte.includes('suspended')) {
     return 'Ce compte est suspendu. Contactez un administrateur.';
@@ -125,50 +117,92 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-ink-900 via-ink to-ink-800 px-6">
-      <div className="w-full max-w-sm animate-slide-up">
-        <div className="mb-6 flex items-center justify-center gap-2.5">
-          <BotOrb size={34} glow />
-          <span className="font-display text-xl font-semibold tracking-tight text-white">Luminae</span>
+    <main className="relative flex min-h-screen items-center justify-center aurora-dark-bg px-6 py-12">
+      {/* Halo lumineux d'arrière-plan */}
+      <div className="absolute h-96 w-96 rounded-full bg-aurora-500/15 blur-3xl" aria-hidden="true" />
+
+      <div className="relative w-full max-w-md animate-slide-up">
+        {/* Logo & Marque */}
+        <div className="mb-7 flex flex-col items-center justify-center gap-3 text-center">
+          <BotOrb size={44} glow />
+          <div>
+            <h2 className="font-display text-2xl font-bold tracking-tight text-white">Luminae</h2>
+            <p className="text-xs text-aurora-300 font-medium">Espace Agent & Administration</p>
+          </div>
         </div>
 
-        <div className="rounded-2xl bg-white p-7 shadow-panel">
-          <h1 className="font-display text-lg font-semibold">
+        {/* Panneau principal en verre dépoli */}
+        <div className="glass-dark rounded-3xl p-8 shadow-card-dark">
+          {/* Sélecteur d'onglets de connexion */}
+          {mode !== 'reset' && (
+            <div className="mb-6 flex rounded-xl border border-white/10 bg-white/5 p-1 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setSuccess(null);
+                  setMode('login');
+                }}
+                className={`flex-1 rounded-lg py-2 font-medium transition ${
+                  mode === 'login' ? 'bg-lagoon-600 text-white shadow-sm' : 'text-mist-400 hover:text-white'
+                }`}
+              >
+                Mot de passe
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setSuccess(null);
+                  setMode('magic');
+                }}
+                className={`flex-1 rounded-lg py-2 font-medium transition ${
+                  mode === 'magic' ? 'bg-aurora-500/20 text-aurora-300' : 'text-mist-400 hover:text-white'
+                }`}
+              >
+                ✨ Lien direct
+              </button>
+            </div>
+          )}
+
+          <h1 className="font-display text-lg font-semibold text-white">
             {mode === 'login'
-              ? 'Espace agent'
+              ? 'Connexion sécurisée'
               : mode === 'magic'
-                ? 'Lien de connexion direct'
+                ? 'Lien de connexion instantané'
                 : mode === 'forgot'
-                  ? 'Mot de passe oublié'
-                  : 'Nouveau mot de passe'}
+                  ? 'Réinitialiser le mot de passe'
+                  : 'Définir un nouveau mot de passe'}
           </h1>
-          <p className="mt-1 text-sm text-ink-500">
+          <p className="mt-1 text-xs leading-relaxed text-mist-400">
             {mode === 'login'
-              ? 'Connectez-vous pour accéder à la boîte de réception.'
+              ? 'Accédez à votre boîte de réception et vos outils d’assistance.'
               : mode === 'magic'
-                ? 'Recevez un lien par e-mail pour vous connecter en un clic sans mot de passe.'
+                ? 'Recevez un lien sécurisé dans votre boîte mail pour vous connecter en 1 clic.'
                 : mode === 'forgot'
-                  ? 'Recevez un lien par e-mail pour redéfinir votre mot de passe.'
-                  : 'Choisissez un nouveau mot de passe sécurisé.'}
+                  ? 'Entrez votre adresse pour recevoir le lien de récupération.'
+                  : 'Saisissez votre nouveau mot de passe (8 caractères minimum).'}
           </p>
 
+          {/* Formulaire Mot de passe */}
           {mode === 'login' && (
-            <form onSubmit={submitLogin} className="mt-5 space-y-3">
+            <form onSubmit={submitLogin} className="mt-6 space-y-4">
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-ink-600">E-mail</span>
+                <span className="mb-1.5 block text-xs font-medium text-mist-200">Adresse e-mail</span>
                 <input
                   type="email"
                   required
                   autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-xl border border-mist-300 px-3.5 py-2.5 text-sm outline-none transition focus:border-lagoon-400"
+                  className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-mist-400 outline-none transition focus:border-aurora-400 focus:bg-white/10 focus:ring-2 focus:ring-aurora-500/20"
                   placeholder="vous@exemple.fr"
                 />
               </label>
+
               <label className="block">
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="text-xs font-medium text-ink-600">Mot de passe</span>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="text-xs font-medium text-mist-200">Mot de passe</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -176,7 +210,7 @@ export default function LoginPage() {
                       setSuccess(null);
                       setMode('forgot');
                     }}
-                    className="text-xs text-lagoon-600 hover:underline"
+                    className="text-xs text-aurora-300 hover:underline"
                   >
                     Oublié ?
                   </button>
@@ -187,101 +221,97 @@ export default function LoginPage() {
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-xl border border-mist-300 px-3.5 py-2.5 text-sm outline-none transition focus:border-lagoon-400"
+                  className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-mist-400 outline-none transition focus:border-aurora-400 focus:bg-white/10 focus:ring-2 focus:ring-aurora-500/20"
                   placeholder="••••••••"
                 />
               </label>
 
-              {error && <p className="rounded-lg bg-coral-50 px-3 py-2 text-xs text-coral-600">{error}</p>}
+              {error && (
+                <p className="rounded-xl border border-coral-500/30 bg-coral-500/10 px-3.5 py-2.5 text-xs text-coral-300">
+                  {error}
+                </p>
+              )}
 
               <button
                 type="submit"
                 disabled={busy}
-                className="w-full rounded-xl bg-lagoon-600 py-2.5 text-sm font-semibold text-white transition hover:bg-lagoon-700 disabled:opacity-50"
+                className="w-full rounded-xl bg-lagoon-600 py-3 text-sm font-semibold text-white shadow-glow-sm transition hover:bg-lagoon-500 disabled:opacity-50"
               >
-                {busy ? 'Connexion…' : 'Se connecter'}
+                {busy ? 'Connexion en cours…' : 'Se connecter &rarr;'}
               </button>
-
-              <div className="pt-2 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setError(null);
-                    setSuccess(null);
-                    setMode('magic');
-                  }}
-                  className="text-xs text-ink-500 hover:text-lagoon-600 hover:underline"
-                >
-                  ✨ Se connecter sans mot de passe (lien direct)
-                </button>
-              </div>
             </form>
           )}
 
+          {/* Formulaire Lien Magique */}
           {mode === 'magic' && (
-            <form onSubmit={submitMagicLink} className="mt-5 space-y-3">
+            <form onSubmit={submitMagicLink} className="mt-6 space-y-4">
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-ink-600">E-mail de votre compte agent</span>
+                <span className="mb-1.5 block text-xs font-medium text-mist-200">E-mail de votre compte agent</span>
                 <input
                   type="email"
                   required
                   autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-xl border border-mist-300 px-3.5 py-2.5 text-sm outline-none transition focus:border-lagoon-400"
+                  className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-mist-400 outline-none transition focus:border-aurora-400 focus:bg-white/10 focus:ring-2 focus:ring-aurora-500/20"
                   placeholder="vous@exemple.fr"
                 />
               </label>
 
-              {error && <p className="rounded-lg bg-coral-50 px-3 py-2 text-xs text-coral-600">{error}</p>}
-              {success && <p className="rounded-lg bg-lagoon-50 px-3 py-2 text-xs text-lagoon-700">{success}</p>}
+              {error && (
+                <p className="rounded-xl border border-coral-500/30 bg-coral-500/10 px-3.5 py-2.5 text-xs text-coral-300">
+                  {error}
+                </p>
+              )}
+              {success && (
+                <p className="rounded-xl border border-lagoon-500/30 bg-lagoon-500/10 px-3.5 py-2.5 text-xs text-lagoon-300">
+                  {success}
+                </p>
+              )}
 
               <button
                 type="submit"
                 disabled={busy}
-                className="w-full rounded-xl bg-lagoon-600 py-2.5 text-sm font-semibold text-white transition hover:bg-lagoon-700 disabled:opacity-50"
+                className="w-full rounded-xl bg-aurora-500 py-3 text-sm font-semibold text-ink-950 shadow-glow-sm transition hover:bg-aurora-400 disabled:opacity-50"
               >
-                {busy ? 'Envoi…' : 'Envoyer le lien magique'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setError(null);
-                  setSuccess(null);
-                  setMode('login');
-                }}
-                className="w-full text-center text-xs text-ink-500 hover:text-ink hover:underline"
-              >
-                Retour à la connexion par mot de passe
+                {busy ? 'Envoi en cours…' : 'Envoyer le lien magique'}
               </button>
             </form>
           )}
 
+          {/* Formulaire Mot de passe oublié */}
           {mode === 'forgot' && (
-            <form onSubmit={submitForgot} className="mt-5 space-y-3">
+            <form onSubmit={submitForgot} className="mt-6 space-y-4">
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-ink-600">E-mail de votre compte</span>
+                <span className="mb-1.5 block text-xs font-medium text-mist-200">E-mail de votre compte</span>
                 <input
                   type="email"
                   required
                   autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full rounded-xl border border-mist-300 px-3.5 py-2.5 text-sm outline-none transition focus:border-lagoon-400"
+                  className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-mist-400 outline-none transition focus:border-aurora-400 focus:bg-white/10 focus:ring-2 focus:ring-aurora-500/20"
                   placeholder="vous@exemple.fr"
                 />
               </label>
 
-              {error && <p className="rounded-lg bg-coral-50 px-3 py-2 text-xs text-coral-600">{error}</p>}
-              {success && <p className="rounded-lg bg-lagoon-50 px-3 py-2 text-xs text-lagoon-700">{success}</p>}
+              {error && (
+                <p className="rounded-xl border border-coral-500/30 bg-coral-500/10 px-3.5 py-2.5 text-xs text-coral-300">
+                  {error}
+                </p>
+              )}
+              {success && (
+                <p className="rounded-xl border border-lagoon-500/30 bg-lagoon-500/10 px-3.5 py-2.5 text-xs text-lagoon-300">
+                  {success}
+                </p>
+              )}
 
               <button
                 type="submit"
                 disabled={busy}
-                className="w-full rounded-xl bg-lagoon-600 py-2.5 text-sm font-semibold text-white transition hover:bg-lagoon-700 disabled:opacity-50"
+                className="w-full rounded-xl bg-lagoon-600 py-3 text-sm font-semibold text-white transition hover:bg-lagoon-500 disabled:opacity-50"
               >
-                {busy ? 'Envoi…' : 'Envoyer le lien'}
+                {busy ? 'Envoi…' : 'Envoyer le lien de réinitialisation'}
               </button>
 
               <button
@@ -291,44 +321,50 @@ export default function LoginPage() {
                   setSuccess(null);
                   setMode('login');
                 }}
-                className="w-full text-center text-xs text-ink-500 hover:text-ink hover:underline"
+                className="w-full text-center text-xs text-mist-400 hover:text-white hover:underline"
               >
                 Retour à la connexion
               </button>
             </form>
           )}
 
+          {/* Formulaire Nouveau mot de passe */}
           {mode === 'reset' && (
-            <form onSubmit={submitReset} className="mt-5 space-y-3">
+            <form onSubmit={submitReset} className="mt-6 space-y-4">
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-ink-600">Nouveau mot de passe</span>
+                <span className="mb-1.5 block text-xs font-medium text-mist-200">Nouveau mot de passe</span>
                 <input
                   type="password"
                   required
                   minLength={8}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full rounded-xl border border-mist-300 px-3.5 py-2.5 text-sm outline-none transition focus:border-lagoon-400"
+                  className="w-full rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-mist-400 outline-none transition focus:border-aurora-400 focus:bg-white/10 focus:ring-2 focus:ring-aurora-500/20"
                   placeholder="••••••••"
                 />
               </label>
 
-              {error && <p className="rounded-lg bg-coral-50 px-3 py-2 text-xs text-coral-600">{error}</p>}
+              {error && (
+                <p className="rounded-xl border border-coral-500/30 bg-coral-500/10 px-3.5 py-2.5 text-xs text-coral-300">
+                  {error}
+                </p>
+              )}
 
               <button
                 type="submit"
                 disabled={busy || newPassword.length < 8}
-                className="w-full rounded-xl bg-lagoon-600 py-2.5 text-sm font-semibold text-white transition hover:bg-lagoon-700 disabled:opacity-50"
+                className="w-full rounded-xl bg-lagoon-600 py-3 text-sm font-semibold text-white transition hover:bg-lagoon-500 disabled:opacity-50"
               >
-                {busy ? 'Mise à jour…' : 'Enregistrer le mot de passe'}
+                {busy ? 'Enregistrement…' : 'Mettre à jour et accéder à l’inbox'}
               </button>
             </form>
           )}
         </div>
 
-        <p className="mt-5 text-center text-xs text-ink-300">
-          <Link href="/" className="hover:text-aurora-300">
-            ← Retour à l’accueil
+        {/* Retour Accueil */}
+        <p className="mt-6 text-center text-xs text-mist-400">
+          <Link href="/" className="transition hover:text-aurora-300">
+            &larr; Retour au site public
           </Link>
         </p>
       </div>

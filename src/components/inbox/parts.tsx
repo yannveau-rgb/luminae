@@ -6,14 +6,14 @@ import { cn, formatDay, initials } from '@/lib/utils';
 import type { ConversationStatus } from '@/lib/types';
 
 const STATUS_STYLES: Record<ConversationStatus, string> = {
-  bot: 'bg-aurora-100 text-aurora-600',
-  waiting: 'bg-sun-100 text-sun-600',
-  assigned: 'bg-lagoon-100 text-lagoon-700',
-  resolved: 'bg-mist text-ink-500'
+  bot: 'bg-aurora-100/70 text-aurora-600 border border-aurora-300/60',
+  waiting: 'bg-sun-100/70 text-sun-600 border border-sun-300/60',
+  assigned: 'bg-lagoon-100/70 text-lagoon-700 border border-lagoon-300/60',
+  resolved: 'bg-mist-200 text-ink-500 border border-mist-300'
 };
 
 const STATUS_TEXT: Record<ConversationStatus, string> = {
-  bot: 'Bot',
+  bot: 'Bot RAG',
   waiting: 'En attente',
   assigned: 'Assignée',
   resolved: 'Résolue'
@@ -23,11 +23,20 @@ export function StatusBadge({ status, className }: { status: ConversationStatus;
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
+        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-medium transition',
         STATUS_STYLES[status] ?? STATUS_STYLES.resolved,
         className
       )}
     >
+      <span
+        className={cn(
+          'h-1.5 w-1.5 rounded-full',
+          status === 'bot' && 'bg-aurora-500 animate-pulse',
+          status === 'waiting' && 'bg-sun-500',
+          status === 'assigned' && 'bg-lagoon-500',
+          status === 'resolved' && 'bg-ink-400'
+        )}
+      />
       {STATUS_TEXT[status] ?? status}
     </span>
   );

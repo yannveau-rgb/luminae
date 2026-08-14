@@ -461,38 +461,41 @@ export default function WidgetPage() {
       className="flex h-[100dvh] flex-col overflow-hidden bg-gradient-to-b from-white to-mist font-sans text-ink"
       style={{ '--accent': accent, '--focus-color': accent } as React.CSSProperties}
     >
-      {/* En-tête */}
+      {/* En-tête moderne en verre dépoli */}
       <header
-        className="px-4 py-3.5 text-white"
-        style={{
-          background: `linear-gradient(118deg, ${accent}, color-mix(in srgb, ${accent} 55%, #2fc6d4))`
-        }}
+        className="relative z-10 flex shrink-0 items-center justify-between border-b border-mist-300/80 bg-white/90 px-4 py-3.5 backdrop-blur-md"
       >
-        <div className="flex items-center gap-3">
-          <div className="rounded-full ring-4 ring-white/25">
-            <BotOrb size={38} accent="#ffffff" glow={typingFrom === 'bot' || sending} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate font-display text-[15px] font-semibold leading-tight">{botName}</h1>
-            <p className="flex items-center gap-1.5 text-[12px] text-white/85">
+        <div className="flex min-w-0 items-center gap-3">
+          {status === 'bot' ? (
+            <BotOrb size={34} accent={accent} glow={typingFrom === 'bot'} />
+          ) : (
+            <AgentAvatar name={botName} size={34} />
+          )}
+          <div className="min-w-0">
+            <h1 className="truncate font-display text-sm font-semibold tracking-tight text-ink">{botName}</h1>
+            <p className="flex items-center gap-1.5 text-[11px] text-ink-500 font-medium">
               <span
-                className={`inline-block h-1.5 w-1.5 rounded-full ${status === 'waiting' ? 'bg-sun-300' : 'bg-white'}`}
+                className={`h-2 w-2 rounded-full ${
+                  status === 'bot' ? 'bg-aurora-500 animate-pulse' : 'bg-lagoon-500'
+                }`}
                 aria-hidden
               />
               {statusLine}
             </p>
           </div>
-          {status === 'bot' && (
-            <button
-              onClick={askHuman}
-              aria-label="Parler à un humain"
-              title="Parler à un humain"
-              className="rounded-full bg-white/15 p-2 transition hover:bg-white/30"
-            >
-              <HumanIcon className="h-[18px] w-[18px]" />
-            </button>
-          )}
         </div>
+
+        {status === 'bot' && (
+          <button
+            onClick={askHuman}
+            aria-label="Parler à un conseiller humain"
+            title="Parler à un conseiller humain"
+            className="flex items-center gap-1 rounded-full border border-mist-300 bg-white/80 px-2.5 py-1.5 text-xs font-medium text-ink-600 shadow-sm transition hover:bg-lagoon-50 hover:text-lagoon-700 hover:border-lagoon-200"
+          >
+            <HumanIcon className="h-3.5 w-3.5" />
+            <span className="text-[11px]">Humain</span>
+          </button>
+        )}
       </header>
 
       {/* Fil de messages */}

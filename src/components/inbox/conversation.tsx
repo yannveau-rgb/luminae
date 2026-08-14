@@ -425,46 +425,69 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
         </div>
         {/* Copilot IA */}
         {!resolved && (
-          <div className="border-t border-mist-300 bg-mist-50 px-4 py-2">
+          <div className="border-t border-mist-300 bg-gradient-to-b from-mist-50 to-white px-4 py-2.5">
             {!copilotOpen ? (
               <button
                 onClick={runCopilot}
                 disabled={copilotBusy}
-                className="inline-flex items-center gap-1.5 rounded-full border border-aurora-300 bg-white px-3 py-1.5 text-xs font-semibold text-lagoon-700 transition hover:bg-aurora-100/50 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-xl border border-aurora-300 bg-white px-3.5 py-2 text-xs font-semibold text-lagoon-700 shadow-sm transition hover:bg-aurora-50/60 hover:shadow-glow-sm disabled:opacity-50"
               >
-                ✨ {copilotBusy ? 'Génération…' : 'Suggérer une réponse (IA)'}
+                <span className="text-sm">✨</span>
+                <span>{copilotBusy ? 'Génération en cours…' : 'Suggérer une réponse Copilot (IA)'}</span>
               </button>
             ) : (
-              <div className="rounded-xl border border-aurora-300 bg-white p-3">
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-lagoon-700">
-                    Suggestion Copilot
-                  </span>
-                  <button onClick={() => setCopilotOpen(false)} className="text-xs text-ink-400 hover:text-ink">
+              <div className="animate-slide-up rounded-2xl border border-aurora-300/80 bg-white p-4 shadow-glow-sm">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-md bg-aurora-100 text-xs">✨</span>
+                    <span className="font-display text-xs font-bold uppercase tracking-wider text-lagoon-700">
+                      Copilot Luminae
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setCopilotOpen(false)}
+                    className="rounded-lg p-1 text-xs text-ink-400 hover:bg-mist hover:text-ink"
+                  >
                     Masquer
                   </button>
                 </div>
+
                 {copilotBusy ? (
-                  <p className="py-2 text-sm text-ink-400">Génération de la suggestion…</p>
+                  <div className="flex items-center gap-2 py-3 text-xs text-ink-500">
+                    <TypingDots accent="#0B7A6E" />
+                    <span>L&apos;IA analyse la conversation et interroge la base documentaire…</span>
+                  </div>
                 ) : (
                   <>
-                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-700">{copilotText}</p>
+                    <p className="whitespace-pre-wrap rounded-xl bg-mist-50 p-3 text-sm leading-relaxed text-ink-800">
+                      {copilotText}
+                    </p>
+
                     {copilotSources.length > 0 && (
-                      <p className="mt-1.5 text-[11px] text-ink-400">
-                        Sources : {copilotSources.map((s) => s.title).join(' · ')}
-                      </p>
+                      <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs text-ink-500">
+                        <span className="text-[11px] font-medium text-ink-400">Sources :</span>
+                        {copilotSources.map((s) => (
+                          <span
+                            key={s.id}
+                            className="inline-flex items-center gap-1 rounded-md border border-mist-300 bg-white px-2 py-0.5 text-[11px] text-ink-600 shadow-2xs"
+                          >
+                            📖 {s.title}
+                          </span>
+                        ))}
+                      </div>
                     )}
-                    <div className="mt-2 flex items-center gap-2">
+
+                    <div className="mt-3 flex items-center gap-2">
                       <button
                         onClick={insertCopilot}
                         disabled={!copilotText}
-                        className="rounded-full bg-lagoon-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-lagoon-700 disabled:opacity-40"
+                        className="rounded-xl bg-lagoon-600 px-3.5 py-2 text-xs font-semibold text-white shadow-glow-sm transition hover:bg-lagoon-500 disabled:opacity-40"
                       >
-                        Insérer dans la réponse
+                        Insérer dans la réponse &rarr;
                       </button>
                       <button
                         onClick={runCopilot}
-                        className="rounded-full border border-mist-300 px-3 py-1.5 text-xs font-medium text-ink-600 transition hover:bg-mist"
+                        className="rounded-xl border border-mist-300 bg-white px-3 py-2 text-xs font-medium text-ink-600 transition hover:bg-mist"
                       >
                         Régénérer
                       </button>

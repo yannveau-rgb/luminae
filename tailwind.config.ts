@@ -112,13 +112,13 @@ const config: Config = {
       boxShadow: {
         panel: '0 12px 40px -8px rgba(8, 22, 36, 0.22), 0 2px 8px rgba(8, 22, 36, 0.08)',
         bubble: '0 1px 2px rgba(8, 22, 36, 0.06), 0 6px 20px -6px rgba(8, 22, 36, 0.12)',
-        // `glow` / `glow-sm` étaient employés par la page d'accueil sans jamais
-        // avoir été définis : les deux appels à l'action et le bloc
-        // d'intégration n'avaient donc aucune ombre. Teintés lagoon/aurora
-        // plutôt que neutres — c'est la lumière qui signe le système « Lumen ».
         'glow-sm': '0 4px 16px -4px rgba(14, 140, 125, 0.34), 0 1px 3px rgba(8, 22, 36, 0.08)',
         glow: '0 14px 40px -12px rgba(47, 198, 212, 0.40), 0 2px 10px rgba(8, 22, 36, 0.14)',
-        halo: '0 0 0 6px rgba(47, 198, 212, 0.12), 0 0 24px rgba(47, 198, 212, 0.35)'
+        'glow-lg': '0 20px 60px -15px rgba(47, 198, 212, 0.35), 0 0 30px rgba(11, 122, 110, 0.2)',
+        'glow-aurora': '0 0 50px -10px rgba(47, 198, 212, 0.35)',
+        halo: '0 0 0 6px rgba(47, 198, 212, 0.12), 0 0 24px rgba(47, 198, 212, 0.35)',
+        'card-hover': '0 12px 32px -4px rgba(8, 22, 36, 0.12), 0 4px 12px rgba(8, 22, 36, 0.06)',
+        'card-dark': '0 16px 40px -8px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08)'
       },
       keyframes: {
         'msg-in': {
@@ -140,6 +140,14 @@ const config: Config = {
         'slide-up': {
           '0%': { opacity: '0', transform: 'translateY(16px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' }
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-6px)' }
+        },
+        shimmer: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(100%)' }
         }
       },
       animation: {
@@ -147,7 +155,9 @@ const config: Config = {
         'halo-breathe': 'halo-breathe 3.2s ease-in-out infinite',
         'dot-pulse': 'dot-pulse 1.2s ease-in-out infinite',
         'fade-in': 'fade-in 0.2s ease-out both',
-        'slide-up': 'slide-up 0.3s cubic-bezier(0.2, 0.8, 0.25, 1) both'
+        'slide-up': 'slide-up 0.3s cubic-bezier(0.2, 0.8, 0.25, 1) both',
+        float: 'float 5s ease-in-out infinite',
+        shimmer: 'shimmer 2.5s infinite'
       }
     }
   },
