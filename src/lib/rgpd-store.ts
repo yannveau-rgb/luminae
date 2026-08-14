@@ -1,6 +1,5 @@
-/** Gestionnaire des demandes d'effacement RGPD (Droit à l'oubli supervisé par agent). */
-
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import type { Json } from './supabase/database.types';
 
 export interface RgpdRequest {
   id: string;
@@ -65,7 +64,7 @@ export async function createRgpdRequest(req: {
 
   store.rgpd_requests = updated;
 
-  await db.from('bot_settings').update({ suggestions: store as any }).eq('id', 1);
+  await db.from('bot_settings').update({ suggestions: store as unknown as Json }).eq('id', 1);
 
   return newReq;
 }
@@ -94,6 +93,6 @@ export async function markRgpdProcessed(requestId: string, agentName: string): P
 
   store.rgpd_requests = updated;
 
-  await db.from('bot_settings').update({ suggestions: store as any }).eq('id', 1);
+  await db.from('bot_settings').update({ suggestions: store as unknown as Json }).eq('id', 1);
   return true;
 }
