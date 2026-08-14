@@ -111,6 +111,8 @@ export interface BotSettings {
   suggestions: string[];
   rag_threshold: number;
   rag_top_k: number;
+  /** Politique de confidentialité affichée dans le pied du widget (S-11). */
+  privacy_url: string | null;
 }
 
 export interface BusinessHours {
@@ -155,4 +157,6 @@ export interface WidgetSettings {
   welcome_message: string;
   accent_color: string;
   suggestions: string[];
+  /** Politique de confidentialité, affichée dans le pied du widget (S-11). */
+  privacy_url: string | null;
 }

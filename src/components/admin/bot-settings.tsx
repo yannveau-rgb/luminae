@@ -80,6 +80,20 @@ export function BotSettingsForm() {
                 />
               </Field>
             </div>
+            <div className="sm:col-span-2">
+              <Field
+                label="Politique de confidentialité"
+                hint="Adresse https. Affichée dans le pied du widget, à côté de « Supprimer mes données ». Laisser vide masque le lien."
+              >
+                <input
+                  className={inputCls}
+                  type="url"
+                  placeholder="https://votre-site.fr/confidentialite"
+                  value={s.privacy_url ?? ''}
+                  onChange={(e) => set('privacy_url', e.target.value)}
+                />
+              </Field>
+            </div>
           </div>
         </Card>
         <Card>

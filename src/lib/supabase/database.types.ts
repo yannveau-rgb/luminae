@@ -295,6 +295,7 @@ export type Database = {
           suggestions: Json;
           rag_threshold: number;
           rag_top_k: number;
+          privacy_url: string | null;
           updated_at: string;
         };
         Insert: {
@@ -311,6 +312,7 @@ export type Database = {
           suggestions?: Json;
           rag_threshold?: number;
           rag_top_k?: number;
+          privacy_url?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -327,6 +329,7 @@ export type Database = {
           suggestions?: Json;
           rag_threshold?: number;
           rag_top_k?: number;
+          privacy_url?: string | null;
           updated_at?: string;
         };
         Relationships: [];

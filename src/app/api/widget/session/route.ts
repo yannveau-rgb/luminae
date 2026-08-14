@@ -54,7 +54,8 @@ export async function POST(req: Request) {
       avatar_url: s?.avatar_url ?? null,
       welcome_message: s?.welcome_message ?? 'Bonjour 👋 Comment puis-je vous aider ?',
       accent_color: s?.accent_color ?? '#0E8C7D',
-      suggestions: (Array.isArray(s?.suggestions) ? s!.suggestions : []) as unknown as string[]
+      suggestions: (Array.isArray(s?.suggestions) ? s!.suggestions : []) as unknown as string[],
+      privacy_url: s?.privacy_url ?? null
     };
 
     // Conversation active (non résolue) ?

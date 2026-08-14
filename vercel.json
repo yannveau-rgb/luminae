@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "comment": "Politique de conservation (S-11) : purge des conversations resolues au-dela de la duree de conservation, et des visiteurs sans conversation. Necessite CRON_SECRET, que Vercel joint automatiquement a la requete.",
+      "path": "/api/admin/purge",
+      "schedule": "0 4 * * *"
+    }
+  ]
+}

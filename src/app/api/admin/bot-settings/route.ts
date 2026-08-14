@@ -51,6 +51,31 @@ export async function PUT(req: Request) {
     if (Number.isInteger(body.rag_top_k) && body.rag_top_k >= 1 && body.rag_top_k <= 10) {
       patch.rag_top_k = body.rag_top_k;
     }
+    // Politique de confidentialité, affichée dans le pied du widget. https
+    // exigé : un lien en http sur un site client déclencherait un avertissement
+    // de contenu mixte, et c'est un lien de conformité — il doit inspirer
+    // confiance.
+    if (typeof body.privacy_url === 'string') {
+      const raw = body.privacy_url.trim();
+      if (!raw) {
+        patch.privacy_url = null;
+      } else {
+        let ok = false;
+        try {
+          ok = new URL(raw).protocol === 'https:';
+        } catch {
+          ok = false;
+        }
+        if (!ok) {
+          return NextResponse.json(
+            { error: 'Le lien de confidentialité doit être une adresse https.' },
+            { status: 400 }
+          );
+        }
+        patch.privacy_url = raw;
+      }
+    }
+
     // L'avatar est rendu dans une balise <img> servie sur TOUS les sites
     // clients : un URL arbitraire y devient un pixel de traçage à l'échelle du
     // parc. On impose donc https, et on écarte les hôtes internes (constat S-15).

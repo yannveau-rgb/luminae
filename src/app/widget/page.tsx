@@ -128,6 +128,7 @@ export default function WidgetPage() {
   const [visitorName, setVisitorName] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState('');
   const [nameDismissed, setNameDismissed] = useState(false);
+  const [erasing, setErasing] = useState(false);
 
   const tokenRef = useRef<string>(getVisitorToken());
   const contextRef = useRef<VisitorContext>({ url: '', os: '', browser: '', device_type: '' });
@@ -298,6 +299,37 @@ export default function WidgetPage() {
     },
     [conversationId, realtimeToken, sending, scrollBottom]
   );
+
+  /**
+   * Droit à l'effacement. Irréversible, donc confirmé — et on repart d'une
+   * identité neuve : sans nouveau token, la conversation supprimée resterait
+   * affichée jusqu'au rechargement.
+   */
+  const eraseData = useCallback(async () => {
+    if (erasing) return;
+    const ok = window.confirm(
+      'Supprimer définitivement votre historique de conversation et vos données ? Cette action est irréversible.'
+    );
+    if (!ok) return;
+    setErasing(true);
+    try {
+      const res = await fetch('/api/widget/erase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: tokenRef.current })
+      });
+      if (!res.ok) throw new Error();
+      try {
+        localStorage.removeItem(TOKEN_KEY);
+      } catch {
+        /* stockage indisponible : le rechargement en générera un neuf */
+      }
+      window.location.reload();
+    } catch {
+      setErasing(false);
+      window.alert('La suppression n’a pas pu être effectuée. Réessayez dans un instant.');
+    }
+  }, [erasing]);
 
   /** Enregistre le prénom donné par le visiteur. */
   const submitName = useCallback(async () => {
@@ -669,9 +701,37 @@ export default function WidgetPage() {
           </button>
         )}
       </footer>
-      <p className="bg-white pb-2 text-center text-[10.5px] text-ink-400">
-        Propulsé par <span className="font-display font-semibold">Luminae</span>
-      </p>
+      {/* Pied : transparence sur le traitement, et droit à l'effacement.
+          Un visiteur doit pouvoir savoir qui traite ses données et les
+          supprimer sans écrire à personne (constat S-11). */}
+      <div className="bg-white px-3 pb-2 text-center text-[10.5px] leading-relaxed text-ink-400">
+        <p>
+          Propulsé par <span className="font-display font-semibold">Luminae</span> · assistant IA,
+          réponses générées par Mistral AI (UE)
+        </p>
+        <p className="mt-0.5">
+          {settings?.privacy_url && (
+            <>
+              <a
+                href={settings.privacy_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2 hover:text-ink"
+              >
+                Confidentialité
+              </a>
+              <span aria-hidden> · </span>
+            </>
+          )}
+          <button
+            type="button"
+            onClick={eraseData}
+            className="underline underline-offset-2 hover:text-ink"
+          >
+            {erasing ? 'Suppression…' : 'Supprimer mes données'}
+          </button>
+        </p>
+      </div>
     </main>
   );
 }

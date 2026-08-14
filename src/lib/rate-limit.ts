@@ -32,6 +32,8 @@ export const WIDGET_RULES = {
   feedback: { action: 'feedback', limit: 30, windowSeconds: 600 },
   /** Enregistrement du prénom du visiteur. */
   identify: { action: 'identify', limit: 10, windowSeconds: 600 },
+  /** Droit à l'effacement. Serré : irréversible et coûteux (stockage + cascade). */
+  erase: { action: 'erase', limit: 3, windowSeconds: 3600 },
   /** Indicateur de saisie : relayé souvent, throttlé côté client. */
   typing: { action: 'typing', limit: 120, windowSeconds: 600 }
 } as const satisfies Record<string, RateRule>;

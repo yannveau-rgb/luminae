@@ -33,6 +33,24 @@ export async function uploadAttachment(
   return { storage_path: path, file_name: safeName, mime_type: file.type, size_bytes: file.bytes.byteLength };
 }
 
+/**
+ * Supprime des fichiers du bucket.
+ *
+ * Indispensable avant d'effacer les lignes `attachments` : la cascade SQL ne
+ * touche pas au stockage objet, et les fichiers survivraient indéfiniment à la
+ * conversation qui les portait — ce qui viderait de sens toute politique de
+ * conservation comme tout droit à l'effacement.
+ */
+export async function removeAttachments(paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+  // La suppression se fait par lots : l'API n'aime pas les listes trop longues.
+  for (let i = 0; i < paths.length; i += 100) {
+    const lot = paths.slice(i, i + 100);
+    const { error } = await supabaseAdmin().storage.from(BUCKET).remove(lot);
+    if (error) throw new Error(error.message);
+  }
+}
+
 /** Génère les URLs signées (lecture temporaire) pour une liste de pièces jointes. */
 export async function signAttachments(rows: Attachment[]): Promise<(Attachment & { url: string | null })[]> {
   if (rows.length === 0) return [];
