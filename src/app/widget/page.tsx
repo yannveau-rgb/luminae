@@ -128,24 +128,6 @@ export default function WidgetPage() {
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingSent = useRef(0);
 
-  // Auto-unlock Web Audio on first user interaction in widget iframe
-  useEffect(() => {
-    const unlock = () => {
-      unlockAudioContext();
-      window.removeEventListener('click', unlock);
-      window.removeEventListener('keydown', unlock);
-      window.removeEventListener('touchstart', unlock);
-    };
-    window.addEventListener('click', unlock, { passive: true });
-    window.addEventListener('keydown', unlock, { passive: true });
-    window.addEventListener('touchstart', unlock, { passive: true });
-    return () => {
-      window.removeEventListener('click', unlock);
-      window.removeEventListener('keydown', unlock);
-      window.removeEventListener('touchstart', unlock);
-    };
-  }, []);
-
   useEffect(() => {
     soundMutedRef.current = soundMuted;
   }, [soundMuted]);
