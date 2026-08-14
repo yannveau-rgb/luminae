@@ -50,6 +50,15 @@ export function InboxShell({
   const [notifOpen, setNotifOpen] = useState(false);
   const [cannedOpen, setCannedOpen] = useState(false);
   const [browserPermission, setBrowserPermission] = useState<NotificationPermission | null>(null);
+  /**
+   * Le temps réel a-t-il été refusé ? Les canaux sont privés (migration 0010) :
+   * si les policies de `realtime.messages` ne sont pas encore en place, ou si le
+   * jeton de session est expiré, l'abonnement échoue. Sans repli, l'agent aurait
+   * une boîte de réception silencieuse et figée — le pire des deux mondes, car
+   * rien ne le lui signalerait. On bascule alors sur un rafraîchissement
+   * périodique, et on le dit.
+   */
+  const [realtimeDown, setRealtimeDown] = useState(false);
 
   useEffect(() => {
     setBrowserPermission(getNotificationPermission());
@@ -102,8 +111,15 @@ export function InboxShell({
       await supabase.realtime.setAuth(accessToken);
       if (disposed) return;
 
+      // Un refus d'abonnement bascule en mode dégradé. `SUBSCRIBED` le lève,
+      // pour qu'une coupure réseau passagère se rétablisse d'elle-même.
+      const onStatus = (status: string) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setRealtimeDown(true);
+        else if (status === 'SUBSCRIBED') setRealtimeDown(false);
+      };
+
       inbox = supabase.channel('inbox:all', { config: { private: true } });
-      inbox.on('broadcast', { event: 'inbox:update' }, () => load(tab === 'resolved')).subscribe();
+      inbox.on('broadcast', { event: 'inbox:update' }, () => load(tab === 'resolved')).subscribe(onStatus);
 
       perso = supabase.channel(`agent:${agent.id}`, { config: { private: true } });
       perso
@@ -120,7 +136,7 @@ export function InboxShell({
             }
           });
         })
-        .subscribe();
+        .subscribe(onStatus);
     })();
 
     return () => {
@@ -129,6 +145,17 @@ export function InboxShell({
       if (perso) supabase.removeChannel(perso);
     };
   }, [supabase, agent.id, tab, load, selectedId, router]);
+
+  // Repli : sans temps réel, on rafraîchit la liste et les notifications
+  // périodiquement. Mieux vaut un délai de 15 s qu'une boîte figée.
+  useEffect(() => {
+    if (!realtimeDown) return;
+    const id = setInterval(() => {
+      load(tab === 'resolved');
+      loadNotifs();
+    }, 15000);
+    return () => clearInterval(id);
+  }, [realtimeDown, load, loadNotifs, tab]);
 
   async function logout() {
     await supabase.auth.signOut();
@@ -275,6 +302,18 @@ export function InboxShell({
             </button>
           </div>
         </header>
+
+        {/* Mode dégradé : l'agent doit savoir que sa liste n'est plus vivante,
+            sinon il fait confiance à un affichage qui ne bouge plus. */}
+        {realtimeDown && (
+          <p
+            role="status"
+            className="border-b border-sun-300 bg-sun-50 px-4 py-2 text-[12px] font-medium text-sun-600"
+          >
+            Temps réel indisponible — actualisation toutes les 15 s.
+          </p>
+        )}
+
         {/* Onglets */}
         <div className="flex gap-1 px-4 pt-3">
           {(

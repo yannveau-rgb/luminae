@@ -25,6 +25,8 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
   const [feedback, setFeedback] = useState<Record<string, string>>({});
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [visitorTyping, setVisitorTyping] = useState(false);
+  /** Abonnement refusé (policies 0010 absentes, jeton expiré) → on recharge. */
+  const [realtimeDown, setRealtimeDown] = useState(false);
   const [noteMode, setNoteMode] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,7 +112,10 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
         .on('broadcast', { event: 'typing' }, ({ payload }: { payload: { from?: string; on?: boolean } }) => {
           if (payload?.from === 'visitor') setVisitorTyping(!!payload.on);
         })
-        .subscribe();
+        .subscribe((status) => {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setRealtimeDown(true);
+          else if (status === 'SUBSCRIBED') setRealtimeDown(false);
+        });
     })();
 
     return () => {
@@ -118,6 +123,14 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
       if (ch) supabase.removeChannel(ch);
     };
   }, [supabase, conversationId]);
+
+  // Repli sans temps réel : rechargement périodique du fil. Plus court que
+  // l'intervalle de la liste — ici l'agent attend une réponse en direct.
+  useEffect(() => {
+    if (!realtimeDown) return;
+    const id = setInterval(() => load(), 10000);
+    return () => clearInterval(id);
+  }, [realtimeDown, load]);
 
   async function doAction(action: string, agent_id?: string) {
     const res = await fetch(`/api/agent/conversations/${conversationId}`, {
