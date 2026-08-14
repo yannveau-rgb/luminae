@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { broadcast } from '@/lib/broadcast';
 import { runBotPipeline } from '@/lib/bot-engine';
+import { evaluateWorkflows } from '@/lib/workflow-engine';
 import { notifyAgents } from '@/lib/notify';
 import { enforce, WIDGET_RULES } from '@/lib/rate-limit';
 import { isUuid } from '@/lib/utils';
@@ -123,6 +124,27 @@ export async function POST(req: Request) {
     // compteur de non-lus (migration 0012) et le dernier message ne bougeaient
     // donc pas en direct pendant la phase bot.
     await broadcast('inbox:all', 'inbox:update', { conversation_id: conv.id });
+
+    // Exécution des workflows intelligents (tagging, notes internes, auto-réponses)
+    try {
+      const wfResult = await evaluateWorkflows({
+        conversationId: conv.id,
+        visitorMessage: text,
+        sourceUrl: conv.source_url,
+      });
+
+      // Si le workflow ajoute des notes internes confidentielles pour l'équipe
+      for (const note of wfResult.internalNotes) {
+        await db.from('messages').insert({
+          conversation_id: conv.id,
+          sender: 'system',
+          content: note,
+          internal_note: true,
+        });
+      }
+    } catch (wfErr) {
+      console.warn('[widget/messages] Erreur évaluation workflow:', wfErr);
+    }
 
     if (conv.status === 'bot') {
       // Le moteur bot répond (ou escalade). Réponse et statut arrivent au widget
