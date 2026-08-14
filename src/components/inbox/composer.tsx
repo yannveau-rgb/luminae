@@ -289,25 +289,53 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
         </div>
       )}
 
-      {/* Barre d'outils */}
-      <div className="mb-1.5 flex items-center gap-0.5">
-        <ToolButton label="Gras" onClick={() => exec('bold')}>
-          <b>B</b>
-        </ToolButton>
-        <ToolButton label="Italique" onClick={() => exec('italic')}>
-          <i>I</i>
-        </ToolButton>
-        <ToolButton label="Liste à puces" onClick={() => exec('insertUnorderedList')}>
-          ▤
-        </ToolButton>
-        <ToolButton label="Lien" onClick={openLinkModal}>
-          🔗
-        </ToolButton>
-        <span className="mx-1 h-4 w-px bg-mist-300" />
-        <ToolButton label="Joindre un fichier" onClick={() => fileInputRef.current?.click()}>
-          📎
-        </ToolButton>
-        {uploading && <span className="ml-1 text-[11px] text-ink-400">Téléversement…</span>}
+      {/* Barre d'outils haute précision */}
+      <div className="mb-2 flex items-center justify-between border-b border-mist-200 pb-1.5">
+        <div className="flex items-center gap-0.5">
+          <ToolButton label="Gras (Ctrl+B)" onClick={() => exec('bold')}>
+            <span className="font-bold text-xs">B</span>
+          </ToolButton>
+          <ToolButton label="Italique (Ctrl+I)" onClick={() => exec('italic')}>
+            <span className="italic text-xs font-serif">I</span>
+          </ToolButton>
+          <ToolButton label="Liste à puces" onClick={() => exec('insertUnorderedList')}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="8" y1="6" x2="21" y2="6" />
+              <line x1="8" y1="12" x2="21" y2="12" />
+              <line x1="8" y1="18" x2="21" y2="18" />
+              <line x1="3" y1="6" x2="3.01" y2="6" />
+              <line x1="3" y1="12" x2="3.01" y2="12" />
+              <line x1="3" y1="18" x2="3.01" y2="18" />
+            </svg>
+          </ToolButton>
+          <ToolButton label="Insérer un lien" onClick={openLinkModal}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+            </svg>
+          </ToolButton>
+          <span className="mx-1 h-3.5 w-px bg-mist-300" />
+          <ToolButton label="Joindre un fichier (Images, PDF, Documents)" onClick={() => fileInputRef.current?.click()}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+            </svg>
+          </ToolButton>
+          {uploading && <span className="ml-1 text-[11px] text-lagoon-600 font-medium animate-pulse">Téléversement…</span>}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setQuery('');
+            setPickerOpen((o) => !o);
+          }}
+          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-lagoon-700 bg-lagoon-50 hover:bg-lagoon-100 transition"
+          title="Ouvrir les réponses prédéfinies (/)"
+        >
+          <span>⚡</span>
+          <span>Réponses rapides</span>
+          <kbd className="hidden sm:inline rounded bg-white px-1 text-[10px] text-ink-500 border border-mist-300 font-mono shadow-sm">/</kbd>
+        </button>
       </div>
 
       {/* Erreur d'upload éventuelle */}

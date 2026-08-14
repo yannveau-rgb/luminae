@@ -6,16 +6,16 @@ import { cn, formatDay, initials } from '@/lib/utils';
 import type { ConversationStatus } from '@/lib/types';
 
 const STATUS_STYLES: Record<ConversationStatus, string> = {
-  bot: 'bg-aurora-100/80 text-aurora-600 border border-aurora-300/60',
-  waiting: 'bg-sun-100/80 text-sun-600 border border-sun-300/60',
-  assigned: 'bg-lagoon-100/80 text-lagoon-700 border border-lagoon-300/60',
+  bot: 'bg-aurora-100/90 text-aurora-600 border border-aurora-300',
+  waiting: 'bg-sun-100/90 text-sun-700 border border-sun-300',
+  assigned: 'bg-lagoon-100/90 text-lagoon-700 border border-lagoon-300',
   resolved: 'bg-mist-200 text-ink-500 border border-mist-300'
 };
 
 const STATUS_TEXT: Record<ConversationStatus, string> = {
-  bot: 'Bot RAG',
+  bot: 'Bot Lumi',
   waiting: 'En attente',
-  assigned: 'Assignée',
+  assigned: 'En cours',
   resolved: 'Résolue'
 };
 
@@ -23,7 +23,7 @@ export function StatusBadge({ status, className }: { status: ConversationStatus;
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10.5px] font-semibold transition',
+        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10.5px] font-bold tracking-tight transition',
         STATUS_STYLES[status] ?? STATUS_STYLES.resolved,
         className
       )}
@@ -46,34 +46,43 @@ export function Avatar({
   name,
   url,
   size = 32,
-  className
+  className,
+  online
 }: {
   name: string | null;
   url?: string | null;
   size?: number;
   className?: string;
+  online?: boolean;
 }) {
   const style = { width: size, height: size };
-  if (url) {
-    return (
-      /* eslint-disable-next-line @next/next/no-img-element */
-      <img
-        src={url}
-        alt={name ?? 'Avatar'}
-        style={style}
-        className={cn('shrink-0 rounded-full object-cover ring-1 ring-black/5', className)}
-      />
-    );
-  }
   return (
-    <div
-      style={style}
-      className={cn(
-        'flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-ink-700 to-ink-900 font-display font-bold text-white shadow-sm',
-        className
+    <div className="relative shrink-0" style={style}>
+      {url ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={url}
+          alt={name ?? 'Avatar'}
+          style={style}
+          className={cn('shrink-0 rounded-full object-cover ring-1 ring-black/5', className)}
+        />
+      ) : (
+        <div
+          style={style}
+          className={cn(
+            'flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-ink-700 to-ink-900 font-display font-bold text-white shadow-sm',
+            className
+          )}
+        >
+          <span style={{ fontSize: Math.max(10, size * 0.38) }}>{initials(name)}</span>
+        </div>
       )}
-    >
-      <span style={{ fontSize: Math.max(10, size * 0.38) }}>{initials(name)}</span>
+      {online && (
+        <span
+          className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-lagoon-500 ring-2 ring-white"
+          title="En ligne"
+        />
+      )}
     </div>
   );
 }
@@ -82,7 +91,7 @@ export function DayDivider({ iso }: { iso: string }) {
   return (
     <div className="my-4 flex items-center gap-3" role="separator">
       <div className="h-px flex-1 bg-mist-300/80" />
-      <span className="rounded-full border border-mist-300 bg-white px-2.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wider text-ink-400 shadow-sm">
+      <span className="rounded-full border border-mist-300 bg-white px-3 py-0.5 text-[10.5px] font-bold uppercase tracking-wider text-ink-400 shadow-sm">
         {formatDay(iso)}
       </span>
       <div className="h-px flex-1 bg-mist-300/80" />
@@ -93,7 +102,7 @@ export function DayDivider({ iso }: { iso: string }) {
 export function UnreadBadge({ count }: { count: number }) {
   if (count <= 0) return null;
   return (
-    <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-coral-500 px-1 text-[10px] font-bold text-white shadow-glow-sm">
+    <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-coral-500 px-1 text-[10px] font-bold text-white shadow-glow-sm animate-pulse">
       {count > 99 ? '99+' : count}
     </span>
   );
