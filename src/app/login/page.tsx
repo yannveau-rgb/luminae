@@ -118,22 +118,22 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center aurora-dark-bg px-6 py-12">
+    <main className="relative flex min-h-screen items-center justify-center aurora-dark-bg px-4 py-8 sm:px-6 sm:py-12">
       {/* Halo lumineux d'arrière-plan */}
       <div className="absolute h-96 w-96 rounded-full bg-aurora-500/15 blur-3xl" aria-hidden="true" />
 
       <div className="relative w-full max-w-md animate-slide-up">
         {/* Logo & Marque */}
-        <div className="mb-7 flex flex-col items-center justify-center gap-3 text-center">
-          <BotOrb size={44} glow />
+        <div className="mb-6 flex flex-col items-center justify-center gap-2 text-center">
+          <BotOrb size={40} glow />
           <div>
-            <h2 className="font-display text-2xl font-bold tracking-tight text-white">Luminae</h2>
+            <h2 className="font-display text-xl sm:text-2xl font-bold tracking-tight text-white">Luminae</h2>
             <p className="text-xs text-aurora-300 font-medium">Espace Agent & Administration</p>
           </div>
         </div>
 
         {/* Panneau principal en verre dépoli */}
-        <div className="glass-dark rounded-3xl p-8 shadow-card-dark">
+        <div className="glass-dark rounded-3xl p-5 sm:p-8 shadow-card-dark">
           {/* Sélecteur d'onglets de connexion */}
           {mode !== 'reset' && (
             <div className="mb-6 flex rounded-xl border border-white/10 bg-white/5 p-1 text-xs">

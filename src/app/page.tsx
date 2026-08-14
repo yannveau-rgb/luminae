@@ -26,7 +26,7 @@ const PILLARS = [
       </svg>
     ),
     title: 'Conformité RGPD & CNIL Native',
-    badge: 'Droit à l’oubli en 1 clic',
+    badge: 'Droit à l’oubli supervisé',
     description:
       'Zéro transfert hors UE, aucun cookie traceur tiers. Vos visiteurs exercent leur droit à l’effacement en 1 clic directement dans le widget avec purge immédiate.'
   },
@@ -39,7 +39,7 @@ const PILLARS = [
     title: 'Escalade & Boîte Agent Pro',
     badge: 'Temps réel WebSocket',
     description:
-      'Basculement automatique vers vos conseillers dès que nécessaire. Inbox ultra-rapide avec suivi de navigation en direct (style HubSpot) et Copilot d’aide à la rédaction.'
+      'Basculement automatique vers vos conseillers dès que nécessaire. Inbox unifiée avec suivi de navigation en direct et Copilot d’aide à la rédaction.'
   }
 ];
 
@@ -54,28 +54,30 @@ export default function HomePage() {
   }
 
   return (
-    <main className="min-h-screen aurora-dark-bg text-white selection:bg-aurora-500/30 selection:text-white">
+    <main className="min-h-screen aurora-dark-bg text-white selection:bg-aurora-500/30 selection:text-white overflow-x-hidden">
       {/* ── Navigation ────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 border-b border-white/10 backdrop-blur-xl bg-ink-950/70">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link href="/" className="flex items-center gap-3">
-            <BotOrb size={32} glow />
+      <header className="sticky top-0 z-40 border-b border-white/10 backdrop-blur-xl bg-ink-950/80">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
+          <Link href="/" className="flex items-center gap-2 sm:gap-3">
+            <BotOrb size={28} glow />
             <div className="flex items-baseline gap-2">
-              <span className="font-display text-xl font-bold tracking-tight text-white">Luminae</span>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-aurora-400">Support Souverain</span>
+              <span className="font-display text-lg sm:text-xl font-bold tracking-tight text-white">Luminae</span>
+              <span className="hidden sm:inline text-[10px] font-semibold uppercase tracking-wider text-aurora-400">
+                Support Souverain
+              </span>
             </div>
           </Link>
 
-          <nav className="flex items-center gap-3">
+          <nav className="flex items-center gap-2 sm:gap-3">
             <Link
               href="/widget"
-              className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-xs font-medium text-white transition hover:bg-white/10 hover:border-white/25"
+              className="rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 sm:px-4 sm:py-2 text-xs font-medium text-white transition hover:bg-white/10 hover:border-white/25"
             >
               Tester le Widget
             </Link>
             <Link
               href="/login"
-              className="rounded-xl bg-lagoon-600 px-4 py-2 text-xs font-semibold text-white shadow-glow-sm transition hover:bg-lagoon-500"
+              className="rounded-xl bg-lagoon-600 px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs font-semibold text-white shadow-glow-sm transition hover:bg-lagoon-500"
             >
               Espace Agent &rarr;
             </Link>
@@ -84,15 +86,15 @@ export default function HomePage() {
       </header>
 
       {/* ── Hero Principal ────────────────────────────────────────────────────── */}
-      <section className="relative mx-auto max-w-5xl px-6 pb-20 pt-16 text-center lg:pt-24">
+      <section className="relative mx-auto max-w-5xl px-4 pb-16 pt-12 text-center sm:px-6 sm:pb-20 sm:pt-16 lg:pt-20">
         {/* Badge animé */}
-        <div className="inline-flex items-center gap-2 rounded-full border border-aurora-500/30 bg-aurora-500/10 px-4 py-1.5 text-xs font-medium text-aurora-300 shadow-glow-sm">
-          <span className="text-sm">🇫🇷</span>
-          <span>Plateforme de Chat IA 100% Made in France · Souveraineté & RGPD</span>
+        <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-aurora-500/30 bg-aurora-500/10 px-3.5 py-1.5 text-[11px] sm:text-xs font-medium text-aurora-300 shadow-glow-sm">
+          <span className="text-sm shrink-0">🇫🇷</span>
+          <span className="truncate">Chat IA 100% Made in France · Souveraineté & RGPD</span>
         </div>
 
         {/* Titre percutant */}
-        <h1 className="mt-7 font-display text-4xl font-extrabold tracking-tight text-white sm:text-6xl lg:text-7xl leading-tight">
+        <h1 className="mt-6 font-display text-3xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl leading-tight">
           Le support client IA souverain,
           <br />
           <span className="bg-gradient-to-r from-aurora-300 via-lagoon-300 to-white bg-clip-text text-transparent">
@@ -100,44 +102,45 @@ export default function HomePage() {
           </span>
         </h1>
 
-        <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-mist-300 sm:text-lg">
+        <p className="mx-auto mt-4 max-w-2xl text-sm leading-relaxed text-mist-300 sm:mt-6 sm:text-base md:text-lg">
           Un assistant conversationnel fluide propulsé par <strong>Mistral AI (Paris)</strong>, couplé à une boîte de
-          réception agent haute performance et un droit à l’oubli garanti en 1 clic. L’alternative européenne éthique à Intercom et Zendesk.
+          réception agent haute performance et un droit à l’oubli supervisé. L’alternative européenne éthique à Intercom et Zendesk.
         </p>
 
         {/* Boutons d'action */}
-        <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
+        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
           <Link
             href="/widget"
-            className="flex items-center gap-2 rounded-xl bg-lagoon-600 px-6 py-3.5 text-sm font-semibold text-white shadow-glow transition hover:bg-lagoon-500"
+            className="flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-lagoon-600 px-6 py-3.5 text-sm font-semibold text-white shadow-glow transition hover:bg-lagoon-500"
           >
             <BotOrb size={20} glow={false} />
-            Tester le Widget en Direct
+            <span>Tester le Widget en Direct</span>
           </Link>
           <Link
             href="/login"
-            className="rounded-xl border border-white/20 bg-white/5 px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/10 hover:border-white/30"
+            className="flex w-full sm:w-auto items-center justify-center rounded-xl border border-white/20 bg-white/5 px-6 py-3.5 text-sm font-semibold text-white backdrop-blur-sm transition hover:bg-white/10 hover:border-white/30"
           >
-            Accéder à la Boîte Agent
+            <span>Accéder à la Boîte Agent</span>
           </Link>
         </div>
 
-        {/* ── Mockup Démonstrateur Interactif ─────────────────────────────────── */}
-        <div className="relative mx-auto mt-14 max-w-4xl rounded-2xl border border-white/15 bg-ink-900/90 p-5 shadow-card-dark backdrop-blur-2xl text-left">
+        {/* ── Mockup Démonstrateur Interactif Responsive ─────────────────────────────────── */}
+        <div className="relative mx-auto mt-10 max-w-4xl rounded-2xl border border-white/15 bg-ink-900/90 p-4 sm:p-5 shadow-card-dark backdrop-blur-2xl text-left">
           {/* Barre de fenêtre */}
-          <div className="flex items-center justify-between border-b border-white/10 pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3 sm:pb-4">
             <div className="flex items-center gap-2">
-              <div className="h-3 w-3 rounded-full bg-coral-500/80"></div>
-              <div className="h-3 w-3 rounded-full bg-sun-500/80"></div>
-              <div className="h-3 w-3 rounded-full bg-lagoon-500/80"></div>
-              <span className="ml-2 text-xs font-mono text-mist-400">luminae-experience-preview</span>
+              <div className="h-2.5 w-2.5 rounded-full bg-coral-500/80" />
+              <div className="h-2.5 w-2.5 rounded-full bg-sun-500/80" />
+              <div className="h-2.5 w-2.5 rounded-full bg-lagoon-500/80" />
+              <span className="ml-1 text-[11px] sm:text-xs font-mono text-mist-400">luminae-preview</span>
             </div>
-            <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 p-1 text-xs">
+
+            <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 p-1 text-xs overflow-x-auto">
               <button
                 type="button"
                 onClick={() => setActiveStep('rag')}
-                className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition ${
-                  activeStep === 'rag' ? 'bg-aurora-500/20 text-aurora-300' : 'text-mist-400 hover:text-white'
+                className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition shrink-0 ${
+                  activeStep === 'rag' ? 'bg-aurora-500/20 text-aurora-300 font-bold' : 'text-mist-400 hover:text-white'
                 }`}
               >
                 1. RAG Bot
@@ -145,8 +148,8 @@ export default function HomePage() {
               <button
                 type="button"
                 onClick={() => setActiveStep('human')}
-                className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition ${
-                  activeStep === 'human' ? 'bg-lagoon-500/20 text-lagoon-300' : 'text-mist-400 hover:text-white'
+                className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition shrink-0 ${
+                  activeStep === 'human' ? 'bg-lagoon-500/20 text-lagoon-300 font-bold' : 'text-mist-400 hover:text-white'
                 }`}
               >
                 2. Escalade
@@ -154,34 +157,36 @@ export default function HomePage() {
               <button
                 type="button"
                 onClick={() => setActiveStep('copilot')}
-                className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition ${
-                  activeStep === 'copilot' ? 'bg-sun-500/20 text-sun-300' : 'text-mist-400 hover:text-white'
+                className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition shrink-0 ${
+                  activeStep === 'copilot' ? 'bg-sun-500/20 text-sun-300 font-bold' : 'text-mist-400 hover:text-white'
                 }`}
               >
-                3. Copilot Agent
+                3. Copilot
               </button>
             </div>
           </div>
 
           {/* Corps de la démo */}
-          <div className="mt-5 space-y-3">
+          <div className="mt-4 space-y-3">
             {activeStep === 'rag' && (
               <div className="space-y-3 animate-fade-in">
                 <div className="flex justify-end">
-                  <div className="max-w-md rounded-2xl rounded-br-sm bg-lagoon-600 px-4 py-2.5 text-xs text-white">
+                  <div className="max-w-md rounded-2xl rounded-br-sm bg-lagoon-600 px-3.5 py-2 text-xs text-white leading-relaxed">
                     Bonjour, comment réinitialiser mon mot de passe et quelles sont vos garanties de sécurité RGPD ?
                   </div>
                 </div>
-                <div className="flex gap-3">
-                  <BotOrb size={28} glow />
-                  <div className="max-w-lg rounded-2xl rounded-bl-sm border border-aurora-400/40 bg-white/10 p-3.5 text-xs text-mist-100 backdrop-blur-md">
+                <div className="flex gap-2.5">
+                  <div className="mt-0.5 shrink-0">
+                    <BotOrb size={26} glow />
+                  </div>
+                  <div className="max-w-lg rounded-2xl rounded-bl-sm border border-aurora-400/40 bg-white/10 p-3 text-xs text-mist-100 backdrop-blur-md leading-relaxed">
                     <p className="font-semibold text-aurora-300 mb-1">⚡ Réponse Lumi (Assistant IA) :</p>
                     <p>
                       Pour réinitialiser votre mot de passe, cliquez sur <em>« Mot de passe oublié »</em> sur la page de connexion.
-                      Vos données sont traitées exclusivement sur des serveurs hébergés en France/UE avec chiffrement complet et conformité RGPD stricte.
+                      Vos données sont traitées exclusivement en France/UE avec conformité RGPD stricte.
                     </p>
-                    <div className="mt-2.5 flex items-center gap-2 text-[11px] text-aurora-400">
-                      <span className="rounded-full bg-aurora-500/20 px-2 py-0.5">Source : Guide Sécurité & RGPD</span>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10.5px] text-aurora-400">
+                      <span className="rounded-full bg-aurora-500/20 px-2 py-0.5 font-medium">Source : Guide Sécurité</span>
                       <span>· Confiance : 98%</span>
                     </div>
                   </div>
@@ -192,15 +197,15 @@ export default function HomePage() {
             {activeStep === 'human' && (
               <div className="space-y-3 animate-fade-in">
                 <div className="flex justify-center">
-                  <span className="rounded-full border border-lagoon-400/30 bg-lagoon-500/10 px-3 py-1 text-[11px] font-medium text-lagoon-300">
+                  <span className="rounded-full border border-lagoon-400/30 bg-lagoon-500/10 px-3 py-1 text-[10.5px] font-medium text-lagoon-300 text-center">
                     ⚡ Escalade déclenchée · Yann a rejoint la conversation
                   </span>
                 </div>
-                <div className="flex gap-3">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-lagoon-600 text-xs font-bold text-white">
+                <div className="flex gap-2.5">
+                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-lagoon-600 text-xs font-bold text-white">
                     YV
                   </div>
-                  <div className="max-w-md rounded-2xl rounded-bl-sm border border-white/10 bg-white/5 p-3 text-xs text-mist-100">
+                  <div className="max-w-md rounded-2xl rounded-bl-sm border border-white/10 bg-white/5 p-3 text-xs text-mist-100 leading-relaxed">
                     Bonjour ! Je prends le relais. J&apos;ai sous les yeux votre page consultée et l&apos;historique complet de votre échange. Comment puis-je vous aider ?
                   </div>
                 </div>
@@ -213,7 +218,7 @@ export default function HomePage() {
                   <div className="flex items-center gap-1.5 font-bold text-sun-300">
                     <span>✨ Suggestion Copilot IA :</span>
                   </div>
-                  <p className="mt-1">
+                  <p className="mt-1 leading-relaxed">
                     « Vos attestations sont disponibles au téléchargement sur votre espace personnel sécurisé pendant 12 mois. »
                   </p>
                   <button
@@ -230,31 +235,31 @@ export default function HomePage() {
       </section>
 
       {/* ── Grille des 3 Piliers ──────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-6xl px-6 py-20 border-t border-white/10">
-        <div className="text-center max-w-2xl mx-auto mb-14">
-          <h2 className="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">
+      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20 border-t border-white/10">
+        <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-14">
+          <h2 className="font-display text-xl font-bold tracking-tight text-white sm:text-2xl md:text-3xl">
             L&apos;alternative éthique et souveraine aux plateformes américaines
           </h2>
-          <p className="mt-2 text-sm text-mist-300">
+          <p className="mt-2 text-xs sm:text-sm text-mist-300">
             Conçu pour les entreprises exigeantes soucieuses de la confidentialité de leurs échanges.
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="grid gap-5 sm:gap-6 md:grid-cols-3">
           {PILLARS.map((p) => (
             <div
               key={p.title}
-              className="glass-dark group relative rounded-2xl p-6 transition duration-200 hover:-translate-y-1 hover:border-aurora-500/40"
+              className="glass-dark group relative rounded-2xl p-5 sm:p-6 transition duration-200 hover:-translate-y-1 hover:border-aurora-500/40"
             >
               <div className="flex items-center justify-between">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/5 border border-white/10 group-hover:border-aurora-500/30 transition">
+                <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-white/5 border border-white/10 group-hover:border-aurora-500/30 transition">
                   {p.icon}
                 </div>
-                <span className="rounded-full bg-white/5 px-2.5 py-0.5 text-[11px] font-semibold text-aurora-300 border border-white/10">
+                <span className="rounded-full bg-white/5 px-2.5 py-0.5 text-[10.5px] font-semibold text-aurora-300 border border-white/10">
                   {p.badge}
                 </span>
               </div>
-              <h3 className="mt-4 font-display text-base font-bold text-white">{p.title}</h3>
+              <h3 className="mt-4 font-display text-sm sm:text-base font-bold text-white">{p.title}</h3>
               <p className="mt-2 text-xs leading-relaxed text-mist-300">{p.description}</p>
             </div>
           ))}
@@ -262,42 +267,42 @@ export default function HomePage() {
       </section>
 
       {/* ── Intégration en 1 ligne ───────────────────────────────────────────── */}
-      <section className="mx-auto max-w-4xl px-6 pb-24 text-center">
-        <div className="rounded-3xl border border-white/15 bg-gradient-to-b from-white/10 to-white/5 p-8 shadow-card-dark backdrop-blur-xl">
-          <h2 className="font-display text-xl font-bold text-white sm:text-2xl">
+      <section className="mx-auto max-w-4xl px-4 pb-20 sm:px-6 sm:pb-24 text-center">
+        <div className="rounded-2xl sm:rounded-3xl border border-white/15 bg-gradient-to-b from-white/10 to-white/5 p-5 sm:p-8 shadow-card-dark backdrop-blur-xl">
+          <h2 className="font-display text-lg font-bold text-white sm:text-xl md:text-2xl">
             Intégrable sur n&apos;importe quel site en une seule ligne
           </h2>
-          <p className="mt-2 text-xs text-mist-300">
+          <p className="mt-1.5 text-xs text-mist-300">
             Insérez ce script avant la fermeture de votre balise <code className="text-aurora-300">&lt;/body&gt;</code>.
           </p>
 
-          <div className="relative mx-auto mt-6 max-w-xl text-left">
-            <pre className="overflow-x-auto rounded-xl border border-white/10 bg-ink-950 p-4 font-mono text-xs text-aurora-300 shadow-inner">
+          <div className="relative mx-auto mt-5 max-w-xl text-left">
+            <div className="flex items-center justify-between rounded-t-xl border border-b-0 border-white/10 bg-ink-950/80 px-3.5 py-2">
+              <span className="text-[11px] font-mono text-mist-400">HTML Snippet</span>
+              <button
+                type="button"
+                onClick={copyCode}
+                className="rounded-lg border border-white/15 bg-white/10 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-white/20"
+              >
+                {copied ? '✓ Copié !' : 'Copier'}
+              </button>
+            </div>
+            <pre className="overflow-x-auto rounded-b-xl border border-white/10 bg-ink-950 p-3.5 sm:p-4 font-mono text-[11px] sm:text-xs text-aurora-300 shadow-inner break-all whitespace-pre-wrap sm:whitespace-pre">
               {EMBED_SNIPPET}
             </pre>
-            <button
-              type="button"
-              onClick={copyCode}
-              className="absolute right-3 top-3 rounded-lg border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white backdrop-blur-md transition hover:bg-white/20"
-            >
-              {copied ? '✓ Copié !' : 'Copier'}
-            </button>
           </div>
         </div>
       </section>
 
       {/* ── Pied de page Souveraineté ────────────────────────────────────────── */}
-      <footer className="border-t border-white/10 py-8 text-center text-xs text-mist-400">
-        <div className="flex flex-wrap items-center justify-center gap-4">
-          <span>🇫🇷 100% Made in France</span>
-          <span>·</span>
-          <span>🔒 Hébergement Souverain UE</span>
-          <span>·</span>
-          <span>⚖️ Conforme RGPD & CNIL</span>
-          <span>·</span>
-          <span>✨ Propulsé par Mistral AI</span>
+      <footer className="border-t border-white/10 py-8 px-4 text-center text-xs text-mist-400">
+        <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4">
+          <span className="rounded-md bg-white/5 px-2 py-1 text-[11px]">🇫🇷 100% Made in France</span>
+          <span className="rounded-md bg-white/5 px-2 py-1 text-[11px]">🔒 Hébergement Souverain UE</span>
+          <span className="rounded-md bg-white/5 px-2 py-1 text-[11px]">⚖️ Conforme RGPD & CNIL</span>
+          <span className="rounded-md bg-white/5 px-2 py-1 text-[11px]">✨ Propulsé par Mistral AI</span>
         </div>
-        <p className="mt-2 text-[11px] text-mist-400">
+        <p className="mt-3 text-[11px] text-mist-400">
           Luminae 2.0 · Plateforme de messagerie client souveraine et intelligence artificielle de pointe.
         </p>
       </footer>
