@@ -191,7 +191,7 @@ export default function HomePage() {
 
                 <div className="flex items-start gap-3">
                   <BotOrb size={28} glow />
-                  <div className="rounded-2xl rounded-tl-none border border-lagoon-500/30 bg-lagoon-950/40 p-4 text-mist-100 shadow-glow-sm">
+                  <div className="rounded-2xl rounded-tl-none border border-lagoon-500/30 bg-ink-950 p-4 text-mist-100 shadow-glow-sm">
                     <p>
                       La purge automatique s&apos;exécute quotidiennement à <strong>04h00 UTC</strong>. Elle supprime les
                       conversations résolues au-delà du délai paramétré dans votre administration (par défaut 90 jours).
@@ -214,7 +214,7 @@ export default function HomePage() {
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-lagoon-600 text-xs font-bold text-white">
                     YV
                   </div>
-                  <div className="rounded-2xl rounded-tl-none border border-lagoon-500/40 bg-lagoon-900/30 p-3.5 text-mist-100">
+                  <div className="rounded-2xl rounded-tl-none border border-lagoon-500/40 bg-ink-900 p-3.5 text-mist-100">
                     <p className="font-semibold text-lagoon-300 text-xs">Yann (Agent support)</p>
                     <p className="mt-1">
                       Bonjour ! Je prends le relais de notre assistant. Je vois votre question sur la purge des données.

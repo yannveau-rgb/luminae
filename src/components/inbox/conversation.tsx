@@ -430,7 +430,7 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
               <button
                 onClick={runCopilot}
                 disabled={copilotBusy}
-                className="inline-flex items-center gap-2 rounded-xl border border-aurora-300 bg-white px-3.5 py-2 text-xs font-semibold text-lagoon-700 shadow-sm transition hover:bg-aurora-50/60 hover:shadow-glow-sm disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-xl border border-aurora-300 bg-white px-3.5 py-2 text-xs font-semibold text-lagoon-700 shadow-sm transition hover:bg-aurora-100/50 hover:shadow-glow-sm disabled:opacity-50"
               >
                 <span className="text-sm">✨</span>
                 <span>{copilotBusy ? 'Génération en cours…' : 'Suggérer une réponse Copilot (IA)'}</span>
@@ -469,7 +469,7 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
                         {copilotSources.map((s) => (
                           <span
                             key={s.id}
-                            className="inline-flex items-center gap-1 rounded-md border border-mist-300 bg-white px-2 py-0.5 text-[11px] text-ink-600 shadow-2xs"
+                            className="inline-flex items-center gap-1 rounded-md border border-mist-300 bg-white px-2 py-0.5 text-[11px] text-ink-600 shadow-sm"
                           >
                             📖 {s.title}
                           </span>
