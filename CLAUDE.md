@@ -207,7 +207,11 @@ généré par le client, sans signature, sans expiration, sans rotation).
 - **U-08** ARIA : `aria-live` sur tout le fil du widget, `dt`/`dd` hors `dl`,
   onglets sans `role="tab"`, pas de `h1` dans l'inbox.
 - **U-09** navigation admin en `useState` : pas d'URL par section.
-- **U-10** pas de réinitialisation de mot de passe, pas de MFA.
+- **U-10** — partiellement traité. Les messages d'échec de connexion distinguent
+  désormais mot de passe incorrect, limitation de débit, e-mail non confirmé et
+  compte suspendu. **Restent à faire** : le flux de réinitialisation dans
+  l'application (`resetPasswordForEmail`), qui oblige aujourd'hui à passer par le
+  dashboard Supabase, et le second facteur.
 - **U-11** états de chargement rudimentaires, pas de squelettes.
 - **U-12** Entrée envoie sans indication, `window.prompt` pour les liens.
 - **D-02** accent codé en dur par endroits (`conversation.tsx`, `embed.js`).
@@ -236,6 +240,17 @@ qui s'authentifie mais n'a accès à rien.
 doivent le distinguer, car le statut HTTP ne suffit pas : `no_agent` et
 `not_admin` sont tous deux des 403, mais le premier doit afficher un écran et le
 second rediriger vers `/inbox`.
+
+**Supabase limite les tentatives de connexion.** Après plusieurs échecs, il
+refuse pendant quelques minutes — y compris avec le bon mot de passe. C'est
+indistinguable d'un mauvais mot de passe sans lire le statut de l'erreur, d'où la
+fonction `messageErreur()` de la page de connexion.
+
+L'application n'ayant pas encore de flux de réinitialisation, un mot de passe se
+redéfinit depuis Authentication → Users → ⋮ → *Reset password*.
+
+Comptes administrateurs actuels : `yann.veau@evaluo.eu` et
+`yann.veau@gmail.com`, tous deux liés à leur `auth_user_id`.
 
 ## Pièges connus
 

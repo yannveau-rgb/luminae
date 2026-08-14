@@ -8,6 +8,31 @@ import Link from 'next/link';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { BotOrb } from '@/components/widget/parts';
 
+/**
+ * Traduit l'échec d'authentification en message utile.
+ *
+ * Un message unique « identifiants invalides » couvrait auparavant tous les cas,
+ * y compris ceux où le mot de passe est correct : e-mail non confirmé, compte
+ * suspendu, ou limitation de débit après plusieurs tentatives. L'agent cherchait
+ * alors une faute qui n'existait pas (constat U-10).
+ */
+function messageErreur(err: { message?: string; status?: number; code?: string }): string {
+  const status = err.status ?? 0;
+  const code = (err.code ?? '').toLowerCase();
+  const texte = (err.message ?? '').toLowerCase();
+
+  if (status === 429 || code.includes('rate') || texte.includes('rate limit')) {
+    return 'Trop de tentatives — Supabase a temporairement bloqué les connexions pour ce compte. Patientez quelques minutes avant de réessayer, même avec le bon mot de passe.';
+  }
+  if (code.includes('email_not_confirmed') || texte.includes('not confirmed')) {
+    return 'Cette adresse n’est pas encore confirmée. Ouvrez le lien reçu par e-mail, ou demandez à un administrateur de confirmer le compte.';
+  }
+  if (texte.includes('banned') || texte.includes('suspended')) {
+    return 'Ce compte est suspendu. Contactez un administrateur.';
+  }
+  return 'E-mail ou mot de passe incorrect.';
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const supabase = supabaseBrowser();
@@ -29,7 +54,7 @@ export default function LoginPage() {
     setError(null);
     const { error: err } = await supabase.auth.signInWithPassword({ email, password });
     if (err) {
-      setError('Identifiants invalides — vérifiez votre e-mail et votre mot de passe.');
+      setError(messageErreur(err));
       setBusy(false);
       return;
     }
