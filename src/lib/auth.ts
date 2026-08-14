@@ -61,3 +61,11 @@ export async function requireAgent(requiredRole?: 'admin'): Promise<Agent> {
   }
   return agent as unknown as Agent;
 }
+
+/**
+ * Valide que l'utilisateur courant est connecté ET possède le rôle administrateur.
+ */
+export async function requireAdmin(): Promise<Agent> {
+  return requireAgent('admin');
+}
+
