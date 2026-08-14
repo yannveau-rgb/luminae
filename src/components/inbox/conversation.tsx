@@ -282,7 +282,7 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
   if (error && !conv) {
     return (
       <div className="flex flex-1 items-center justify-center p-6">
-        <p className="text-xs font-semibold text-coral-600 bg-coral-50 px-4 py-3 rounded-2xl border border-coral-200">
+        <p className="text-xs font-semibold text-coral-600 bg-coral-50 px-4 py-3 rounded-2xl border border-coral-300">
           {error}
         </p>
       </div>
@@ -739,10 +739,10 @@ function MessageRow({
       <div
         className={cn(
           'group relative max-w-[72%] rounded-2xl p-3.5 text-xs leading-relaxed shadow-bubble',
-          isAgent && 'rounded-br-xs bg-lagoon-600 text-white',
-          isNote && 'rounded-br-xs border border-sun-300/80 bg-sun-50 text-ink shadow-sm',
-          isBot && 'rounded-bl-xs border border-aurora-300/70 bg-white text-ink shadow-sm',
-          m.sender === 'visitor' && 'rounded-bl-xs border border-mist-300 bg-white text-ink'
+          isAgent && 'rounded-br-sm bg-lagoon-600 text-white',
+          isNote && 'rounded-br-sm border border-sun-300/80 bg-sun-50 text-ink shadow-sm',
+          isBot && 'rounded-bl-sm border border-aurora-300/70 bg-white text-ink shadow-sm',
+          m.sender === 'visitor' && 'rounded-bl-sm border border-mist-300 bg-white text-ink'
         )}
       >
         {isNote && (
