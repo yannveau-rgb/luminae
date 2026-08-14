@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { requireAdmin } from '@/lib/auth';
+import { requireAdmin, AuthError } from '@/lib/auth';
 import { getRgpdRequests, markRgpdProcessed } from '@/lib/rgpd-store';
 import { broadcast } from '@/lib/broadcast';
 
@@ -10,14 +10,15 @@ export const maxDuration = 60;
  * GET /api/admin/rgpd
  * Liste des demandes d'effacement RGPD.
  */
-export async function GET(req: Request) {
-  const { error } = await requireAdmin(req);
-  if (error) return error;
-
+export async function GET() {
   try {
+    await requireAdmin();
     const list = await getRgpdRequests();
     return NextResponse.json({ requests: list });
   } catch (err: any) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -27,10 +28,8 @@ export async function GET(req: Request) {
  * Exécution manuelle de la purge RGPD par un conseiller ou admin.
  */
 export async function POST(req: Request) {
-  const { agent, error } = await requireAdmin(req);
-  if (error || !agent) return error ?? NextResponse.json({ error: 'Non autorisé' }, { status: 401 });
-
   try {
+    const agent = await requireAdmin();
     const body = await req.json().catch(() => ({}));
     const { requestId, visitorId, conversationId, mode } = body as {
       requestId: string;
@@ -83,6 +82,9 @@ export async function POST(req: Request) {
       message: `Données personnelles du visiteur purgées avec succès par ${agentName}.`
     });
   } catch (err: any) {
+    if (err instanceof AuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     console.error('[admin/rgpd]', err);
     return NextResponse.json({ error: 'Échec du traitement RGPD.' }, { status: 500 });
   }
