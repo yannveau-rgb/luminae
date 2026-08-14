@@ -330,9 +330,22 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
     );
   }
 
+  function extractPhone(text?: string | null): string | null {
+    if (!text) return null;
+    const match = text.match(/(?:\+33|0033|0)[1-9](?:[\s.-]?\d{2}){4}/);
+    return match ? match[0] : null;
+  }
+
   const resolved = conv.status === 'resolved';
   const canTake = conv.status === 'waiting' || conv.status === 'bot';
   const assignedName = team.find((t) => t.id === conv.assigned_agent_id)?.full_name ?? null;
+  const detectedPhone =
+    extractPhone(visitor?.display_name) ||
+    messages
+      .filter((m) => m.sender === 'visitor')
+      .map((m) => extractPhone(m.content))
+      .find(Boolean) ||
+    null;
 
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -377,6 +390,19 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
 
           {/* Cluster d'actions rapides */}
           <div className="flex shrink-0 items-center gap-2">
+            {detectedPhone && (
+              <a
+                href={`tel:${detectedPhone.replace(/[\s.-]/g, '')}`}
+                title={`Lancer un appel Quicktalk vers ${detectedPhone}`}
+                className="flex items-center gap-1.5 rounded-xl border border-lagoon-300 bg-lagoon-50 px-3 py-2 text-xs font-semibold text-lagoon-700 shadow-sm transition hover:bg-lagoon-100 hover:border-lagoon-400"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                </svg>
+                <span>Appeler ({detectedPhone})</span>
+              </a>
+            )}
+
             {canTake && (
               <button
                 onClick={() => doAction('take')}
@@ -623,13 +649,33 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
             <span className="h-2 w-2 rounded-full bg-lagoon-500 animate-pulse" title="En ligne" />
           </div>
 
-          <dl className="mt-4 space-y-3.5">
-            {visitor && (
-              <>
-                <Info label="Première visite" value={new Date(visitor.first_seen_at).toLocaleDateString('fr-FR')} />
-                <Info label="Dernière activité" value={timeAgo(visitor.last_seen_at)} />
-              </>
+          <div className="mt-4 space-y-4">
+            {detectedPhone && (
+              <div className="rounded-xl border border-lagoon-200 bg-lagoon-50/70 p-3 text-left">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold text-ink-900">Numéro Détecté</p>
+                  <span className="rounded bg-lagoon-100 px-1.5 py-0.2 text-[9.5px] font-bold text-lagoon-700">Quicktalk</span>
+                </div>
+                <p className="font-mono text-xs text-ink font-bold mt-1">{detectedPhone}</p>
+                <a
+                  href={`tel:${detectedPhone.replace(/[\s.-]/g, '')}`}
+                  className="mt-2.5 inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-lagoon-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-lagoon-700"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                  </svg>
+                  <span>Appeler via Quicktalk</span>
+                </a>
+              </div>
             )}
+
+            <dl className="space-y-3.5">
+              {visitor && (
+                <>
+                  <Info label="Première visite" value={new Date(visitor.first_seen_at).toLocaleDateString('fr-FR')} />
+                  <Info label="Dernière activité" value={timeAgo(visitor.last_seen_at)} />
+                </>
+              )}
             {conv.source_url && <Info label="Page d’origine" value={conv.source_url} isLink />}
             {conv.os && <Info label="Système d'exploitation" value={conv.os} />}
             {conv.browser && <Info label="Navigateur" value={conv.browser} />}

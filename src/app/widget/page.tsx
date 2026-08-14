@@ -112,6 +112,13 @@ export default function WidgetPage() {
   const [nameDismissed, setNameDismissed] = useState(false);
   const [erasing, setErasing] = useState(false);
   const [soundMuted, setSoundMuted] = useState(false);
+  const [telephony, setTelephony] = useState<{
+    enabled: boolean;
+    phone_number: string;
+    quicktalk_url?: string;
+    button_label?: string;
+    widget_display?: string;
+  } | null>(null);
 
   const tokenRef = useRef<string>(getVisitorToken());
   const accessTokenRef = useRef<string | null>(null);
@@ -120,6 +127,24 @@ export default function WidgetPage() {
   const endRef = useRef<HTMLDivElement>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingSent = useRef(0);
+
+  // Auto-unlock Web Audio on first user interaction in widget iframe
+  useEffect(() => {
+    const unlock = () => {
+      unlockAudioContext();
+      window.removeEventListener('click', unlock);
+      window.removeEventListener('keydown', unlock);
+      window.removeEventListener('touchstart', unlock);
+    };
+    window.addEventListener('click', unlock, { passive: true });
+    window.addEventListener('keydown', unlock, { passive: true });
+    window.addEventListener('touchstart', unlock, { passive: true });
+    return () => {
+      window.removeEventListener('click', unlock);
+      window.removeEventListener('keydown', unlock);
+      window.removeEventListener('touchstart', unlock);
+    };
+  }, []);
 
   useEffect(() => {
     soundMutedRef.current = soundMuted;
@@ -142,6 +167,7 @@ export default function WidgetPage() {
       });
       if (res.ok) {
         const data = await res.json();
+        if (data.telephony) setTelephony(data.telephony);
         if (data.messages) {
           setMessages((prev) => {
             // Détection de nouveaux messages arrivés depuis le dernier check
@@ -193,6 +219,7 @@ export default function WidgetPage() {
         if (!res.ok) throw new Error(data.error ?? 'Session impossible');
         if (cancelled) return;
         setSettings(data.settings);
+        if (data.telephony) setTelephony(data.telephony);
         setMessages(data.messages ?? []);
         setFeedbacks(data.feedback ?? {});
         if (data.conversationId) setConversationId(data.conversationId);
@@ -520,6 +547,22 @@ export default function WidgetPage() {
         </div>
 
         <div className="flex items-center gap-1.5">
+          {telephony?.enabled && (telephony.phone_number || telephony.quicktalk_url) && telephony.widget_display !== 'action_card' && (
+            <a
+              href={telephony.quicktalk_url || `tel:${telephony.phone_number.replace(/[\s.-]/g, '')}`}
+              target={telephony.quicktalk_url ? '_blank' : undefined}
+              rel="noopener noreferrer"
+              aria-label="Appeler notre équipe"
+              title={`Appeler notre équipe : ${telephony.phone_number || ''}`}
+              className="flex items-center gap-1.5 rounded-xl border border-lagoon-200 bg-lagoon-50/90 px-2.5 py-1.5 text-xs font-semibold text-lagoon-700 shadow-sm transition hover:border-lagoon-300 hover:bg-lagoon-100"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+              </svg>
+              <span className="hidden sm:inline">{telephony.button_label || 'Appeler'}</span>
+            </a>
+          )}
+
           {status === 'bot' && (
             <button
               onClick={askHuman}
@@ -579,6 +622,29 @@ export default function WidgetPage() {
                 <span className="h-1.5 w-1.5 rounded-full bg-lagoon-500 animate-pulse" />
                 <span>Temps de réponse moyen : 10 secondes</span>
               </div>
+
+              {/* Bouton d'appel téléphonique rapide si activé */}
+              {telephony?.enabled && (telephony.phone_number || telephony.quicktalk_url) && telephony.widget_display !== 'header' && (
+                <div className="mt-3.5 flex items-center justify-between rounded-xl border border-lagoon-200 bg-lagoon-50/60 p-2.5 text-left">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-lagoon-100 text-sm text-lagoon-700">
+                      📞
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-bold text-ink">{telephony.button_label || 'Appeler notre équipe'}</p>
+                      <p className="truncate text-[11px] text-ink-500 font-medium">{telephony.phone_number}</p>
+                    </div>
+                  </div>
+                  <a
+                    href={telephony.quicktalk_url || `tel:${telephony.phone_number.replace(/[\s.-]/g, '')}`}
+                    target={telephony.quicktalk_url ? '_blank' : undefined}
+                    rel="noopener noreferrer"
+                    className="shrink-0 rounded-xl bg-lagoon-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-lagoon-700"
+                  >
+                    Appeler
+                  </a>
+                </div>
+              )}
             </div>
           )}
 

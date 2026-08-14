@@ -125,12 +125,17 @@ export async function POST(req: Request) {
     // en pré-alloue un côté serveur : le widget peut ainsi s'abonner AVANT
     // d'envoyer son premier message (sinon il raterait la réponse du bot), sans
     // que le client ait à choisir lui-même une clé primaire.
-    const conversationId = active?.id ?? randomUUID();
+    // Configuration téléphonie & Quicktalk
+    const store = (s?.suggestions && typeof s.suggestions === 'object' && !Array.isArray(s.suggestions))
+      ? (s.suggestions as Record<string, unknown>)
+      : {};
+    const telephony = store.telephony ?? null;
 
     return NextResponse.json({
       visitorId: visitor.id,
       visitorName: visitor.display_name,
       settings,
+      telephony,
       conversation: active,
       messages,
       feedback,
