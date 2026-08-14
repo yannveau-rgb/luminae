@@ -676,12 +676,13 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
                   <Info label="Dernière activité" value={timeAgo(visitor.last_seen_at)} />
                 </>
               )}
-            {conv.source_url && <Info label="Page d’origine" value={conv.source_url} isLink />}
-            {conv.os && <Info label="Système d'exploitation" value={conv.os} />}
-            {conv.browser && <Info label="Navigateur" value={conv.browser} />}
-            {conv.device_type && <Info label="Type d'appareil" value={conv.device_type} />}
-            {conv.escalated_at && <Info label="Escaladée" value={timeAgo(conv.escalated_at)} />}
-          </dl>
+              {conv.source_url && <Info label="Page d’origine" value={conv.source_url} isLink />}
+              {conv.os && <Info label="Système d'exploitation" value={conv.os} />}
+              {conv.browser && <Info label="Navigateur" value={conv.browser} />}
+              {conv.device_type && <Info label="Type d'appareil" value={conv.device_type} />}
+              {conv.escalated_at && <Info label="Escaladée" value={timeAgo(conv.escalated_at)} />}
+            </dl>
+          </div>
         </aside>
       )}
 
