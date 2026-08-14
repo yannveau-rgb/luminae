@@ -2,11 +2,21 @@ import type { Agent } from './types';
 import { supabaseServer } from './supabase/server';
 import { supabaseAdmin } from './supabase/admin';
 
+/**
+ * Motif du refus. Le code compte autant que le statut : une page qui traite
+ * `no_agent` comme `no_session` renvoie vers /login, or /login renvoie vers
+ * /inbox dès qu'une session existe — d'où une boucle de redirection infinie
+ * pour un compte authentifié sans ligne dans `agents`.
+ */
+export type AuthErrorCode = 'no_session' | 'no_agent' | 'not_admin';
+
 export class AuthError extends Error {
   status: number;
-  constructor(message: string, status = 401) {
+  code: AuthErrorCode;
+  constructor(message: string, status = 401, code: AuthErrorCode = 'no_session') {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -37,9 +47,11 @@ export async function requireAgent(requiredRole?: 'admin'): Promise<Agent> {
     agent = (await db.from('agents').select('*').eq('email', user.email).maybeSingle()).data;
   }
 
-  if (!agent) throw new AuthError('Ce compte n’a pas accès à la plateforme.', 403);
+  if (!agent) {
+    throw new AuthError('Ce compte n’a pas accès à la plateforme.', 403, 'no_agent');
+  }
   if (requiredRole === 'admin' && agent.role !== 'admin') {
-    throw new AuthError('Réservé aux administrateurs.', 403);
+    throw new AuthError('Réservé aux administrateurs.', 403, 'not_admin');
   }
 
   // Lier auth_user_id si besoin (comptes créés avant liaison).

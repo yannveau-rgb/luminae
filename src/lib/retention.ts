@@ -1,5 +1,5 @@
 import { supabaseAdmin } from './supabase/admin';
-import { removeAttachments } from './storage';
+import { listerFichiers, removeAttachments } from './storage';
 
 /**
  * Conservation et effacement des données de conversation.
@@ -25,10 +25,20 @@ export const RETENTION_MONTHS = 12;
 /** Durée au-delà de laquelle un visiteur sans conversation est effacé. */
 export const ORPHAN_VISITOR_MONTHS = 6;
 
+/**
+ * Délai de grâce avant qu'un fichier sans ligne en base soit considéré comme
+ * abandonné. Doit rester large : un agent peut joindre un fichier puis rédiger
+ * longuement avant d'envoyer, et le supprimer sous ses doigts serait pire que
+ * de le garder.
+ */
+export const ORPHAN_FILE_HOURS = 24;
+
 export interface PurgeReport {
   conversations: number;
   visiteurs: number;
   fichiers: number;
+  /** Fichiers présents dans le bucket sans aucune ligne `attachments`. */
+  orphelins: number;
 }
 
 function moisAvant(mois: number): string {
@@ -112,7 +122,46 @@ export async function purgeExpired(): Promise<PurgeReport> {
     }
   }
 
-  return { conversations: ids.length, visiteurs: visiteursSupprimes, fichiers: chemins.length };
+  const orphelins = await purgeOrphanFiles();
+
+  return {
+    conversations: ids.length,
+    visiteurs: visiteursSupprimes,
+    fichiers: chemins.length,
+    orphelins
+  };
+}
+
+/**
+ * Supprime les fichiers du bucket qui ne sont référencés par aucune ligne
+ * `attachments` et dépassent le délai de grâce.
+ *
+ * Ces fichiers proviennent de pièces jointes téléversées puis jamais envoyées :
+ * la ligne en base n'est créée qu'à l'envoi du message, si bien qu'un abandon ne
+ * laisse aucune trace SQL. Ils étaient donc conservés indéfiniment, hors de
+ * portée de toute politique de conservation.
+ */
+export async function purgeOrphanFiles(): Promise<number> {
+  const db = supabaseAdmin();
+
+  const fichiers = await listerFichiers();
+  if (fichiers.length === 0) return 0;
+
+  // Ensemble des chemins connus de la base.
+  const connus = new Set<string>();
+  const { data: lignes } = await db.from('attachments').select('storage_path');
+  for (const l of lignes ?? []) if (l.storage_path) connus.add(l.storage_path);
+
+  const limite = Date.now() - ORPHAN_FILE_HOURS * 3600 * 1000;
+  const aSupprimer = fichiers
+    .filter((f) => !connus.has(f.path))
+    // Sans date de création, on s'abstient : mieux vaut garder un fichier de
+    // trop que d'effacer une pièce jointe en cours de rédaction.
+    .filter((f) => f.created_at !== null && new Date(f.created_at).getTime() < limite)
+    .map((f) => f.path);
+
+  await removeAttachments(aSupprimer);
+  return aSupprimer.length;
 }
 
 /**
@@ -135,5 +184,5 @@ export async function eraseVisitor(token: string): Promise<PurgeReport | null> {
   // (`on delete cascade` sur `conversations.visitor_id`), et de là les messages.
   await db.from('visitors').delete().eq('id', visitor.id);
 
-  return { conversations: ids.length, visiteurs: 1, fichiers: chemins.length };
+  return { conversations: ids.length, visiteurs: 1, fichiers: chemins.length, orphelins: 0 };
 }

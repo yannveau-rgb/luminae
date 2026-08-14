@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --no-warnings src/lib/sanitize.test.ts",
+    "test": "node --experimental-strip-types --no-warnings src/lib/sanitize.test.ts && node --experimental-strip-types --no-warnings src/lib/file-signature.test.ts",
     "db:push": "supabase db push",
     "db:status": "supabase status"
   },

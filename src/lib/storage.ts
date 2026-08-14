@@ -34,6 +34,42 @@ export async function uploadAttachment(
 }
 
 /**
+ * Liste tous les chemins présents dans le bucket, avec leur date de création.
+ *
+ * Nécessaire pour retrouver les fichiers orphelins : un téléversement écrit
+ * dans le stockage, mais la ligne `attachments` n'est créée qu'à l'envoi du
+ * message. Un fichier joint puis abandonné n'a donc AUCUNE trace en base — il
+ * est invisible depuis SQL et survivait indéfiniment (constat S-13).
+ *
+ * L'arborescence est `conversations/{conversationId}/{fichier}` : on parcourt
+ * les dossiers puis leur contenu. `limite` borne le nombre de dossiers examinés
+ * par passage, pour qu'un bucket volumineux n'épuise pas le temps d'exécution.
+ */
+export async function listerFichiers(
+  limite = 500
+): Promise<{ path: string; created_at: string | null }[]> {
+  const storage = supabaseAdmin().storage.from(BUCKET);
+
+  const { data: dossiers, error } = await storage.list('conversations', { limit: limite });
+  if (error) throw new Error(error.message);
+
+  const resultats: { path: string; created_at: string | null }[] = [];
+  for (const dossier of dossiers ?? []) {
+    // `id` nul distingue un dossier d'un objet.
+    if (dossier.id !== null) continue;
+    const { data: fichiers } = await storage.list(`conversations/${dossier.name}`, { limit: 1000 });
+    for (const f of fichiers ?? []) {
+      if (f.id === null) continue;
+      resultats.push({
+        path: `conversations/${dossier.name}/${f.name}`,
+        created_at: f.created_at ?? null
+      });
+    }
+  }
+  return resultats;
+}
+
+/**
  * Supprime des fichiers du bucket.
  *
  * Indispensable avant d'effacer les lignes `attachments` : la cascade SQL ne

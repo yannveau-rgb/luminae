@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { AuthError, requireAgent } from '@/lib/auth';
 import { AdminShell } from '@/components/admin/shell';
+import { AccessDenied } from '@/components/access-denied';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +11,14 @@ export default async function AdminPage() {
   try {
     agent = await requireAgent('admin');
   } catch (err) {
-    if (err instanceof AuthError) redirect(err.status === 401 ? '/login' : '/inbox');
+    if (err instanceof AuthError) {
+      if (err.code === 'no_session') redirect('/login');
+      // Agent authentifié mais sans le rôle admin : la boîte de réception lui
+      // est ouverte, on l'y renvoie.
+      if (err.code === 'not_admin') redirect('/inbox');
+      // Compte hors de l'équipe : /inbox refuserait aussi, d'où la boucle.
+      return <AccessDenied message={err.message} />;
+    }
     throw err;
   }
   return <AdminShell agent={agent} />;

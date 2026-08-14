@@ -15,13 +15,17 @@ reprendre le travail sans relire l'historique.
 npm run dev         # serveur de développement
 npm run build       # build de production
 npm run typecheck   # tsc --noEmit
-npm test            # suite sanitize (Node 24 exécute le TypeScript nativement)
+npm test            # suites sanitize + signatures de fichiers
 npm run db:push     # supabase db push
 ```
 
 `npm test` ne dépend d'aucun runner : Node ≥ 22 avec
 `--experimental-strip-types` suffit, ce qui évite d'ajouter une dépendance et de
 désynchroniser `package-lock.json`.
+
+**Ne pas lancer `npm run build` pendant que le serveur de dev tourne** : le build
+écrase `.next/` et le serveur cherche alors des chunks disparus
+(`Cannot find module './276.js'`). Arrêter, builder, redémarrer.
 
 ## Environnement
 
@@ -39,6 +43,9 @@ désynchroniser `package-lock.json`.
 - `SEED_ADMIN_PASSWORD` — le mot de passe du compte admin initial n'est plus
   dans le code. L'ancienne valeur en clair est dans l'historique git, donc
   compromise.
+- `CRON_SECRET` — sans lui, la purge de conservation n'est déclenchable que
+  manuellement par un admin. Vercel le joint automatiquement aux requêtes de
+  tâche planifiée (`vercel.json`, quotidienne à 4 h).
 
 ## Architecture
 
@@ -109,6 +116,8 @@ Audit complet réalisé sur le commit `84f3d43`. 35 constats, référencés `S-`
 | U-02 compteur de non-lus mort | trigger `bump_unread` (0012) + diffusion `inbox:update` systématique | `unread_count = 1` |
 | U-03 visiteurs indistinguables | route `identify`, prénom demandé après escalade | 5 cas de validation |
 | U-04 contrastes sous AA | tons 600 assombris | ratios recalculés (4,5 à 5,4:1) |
+| S-11 RGPD | conservation 12 mois, effacement par token, mentions IA + confidentialité | 2 messages avant effacement → 0 après ; purge 403 sans admin, 401 sans secret |
+| S-13 pièces jointes | signature réelle vérifiée, orphelins purgés, contrôle d'origine | 19/19 signatures, 4/4 origines |
 | U-13 rien n'annonçait l'IA | « Assistant automatique » dans l'en-tête | rendu vérifié |
 | D-01 6 classes Tailwind inexistantes | échelle `mist` complétée, `glow`/`glow-sm` définis | bloc d'accueil à 15,05:1, ombres présentes |
 | D-06 tokens orphelins | `launcher` retiré, `halo` appliqué à l'orbe | corrige aussi la perte du halo sous `prefers-reduced-motion` |
@@ -132,12 +141,7 @@ généré par le client, sans signature, sans expiration, sans rotation).
 
 ### Non traité
 
-- **S-05** identité visiteur — voir ci-dessus.
-- **S-11 RGPD** — aucune rétention, aucun effacement, aucune mention du
-  traitement IA ni de Mistral comme sous-traitant dans le widget, alors que la
-  page d'accueil affiche « Conformité ». Le plus important des restants.
-- **S-13** pièces jointes — type MIME non vérifié contre le contenu réel
-  (magic bytes), fichiers orphelins jamais purgés, CSRF multipart possible.
+- **S-05** identité visiteur — voir ci-dessus. Seul constat de sécurité restant.
 - **U-05** troncature silencieuse (2 000 / 4 000 / 8 000 caractères sans
   compteur ni avertissement).
 - **U-06** échecs d'upload avalés par un `catch` vide.
@@ -163,7 +167,25 @@ généré par le client, sans signature, sans expiration, sans rotation).
 - **La CSP** — active en production seulement, donc jamais exercée. Surveiller
   la console au premier déploiement.
 
+## Comptes agents
+
+Un compte dans `auth.users` **ne suffit pas** : `requireAgent()` exige une ligne
+dans `public.agents`, appariée par `auth_user_id` ou par e-mail. Créer un
+utilisateur depuis le dashboard Supabase sans ajouter cette ligne donne un compte
+qui s'authentifie mais n'a accès à rien.
+
+`AuthError` porte un motif — `no_session`, `no_agent`, `not_admin` — et les pages
+doivent le distinguer, car le statut HTTP ne suffit pas : `no_agent` et
+`not_admin` sont tous deux des 403, mais le premier doit afficher un écran et le
+second rediriger vers `/inbox`.
+
 ## Pièges connus
+
+- **Ne jamais rediriger vers `/login` sur une `AuthError` indifférenciée.**
+  `/login` renvoie vers `/inbox` dès qu'une session existe : un compte
+  authentifié sans ligne `agents` partait en boucle de redirection infinie, sans
+  aucun message. D'où le motif porté par `AuthError` et le composant
+  `AccessDenied`.
 
 - **`alter table realtime.messages ...`** échoue (« must be owner ») et fait
   avorter tout un script SQL. Supabase active déjà le RLS sur cette table :
