@@ -1,6 +1,6 @@
 'use client';
 
-/** Coquille du back-office : navigation latérale + sections admin. */
+/** Coquille du back-office : navigation latérale + sections admin complètes (Freshchat / Intercom style). */
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -17,6 +17,11 @@ import { AbsencesPanel } from './absences';
 import { ArticlesPanel } from './articles';
 import { CannedPanel } from '@/components/inbox/canned-panel';
 import { StatsPanel } from './stats';
+import { RoutingPanel } from './routing';
+import { TriggersPanel } from './triggers';
+import { PrechatPanel } from './prechat';
+import { WebhooksPanel } from './webhooks';
+import { SecurityPanel } from './security';
 
 const TABS = [
   {
@@ -30,7 +35,7 @@ const TABS = [
   },
   {
     key: 'bot',
-    label: 'Bot & Widget',
+    label: 'Bot & Identité Lumi',
     icon: (
       <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -38,11 +43,29 @@ const TABS = [
     )
   },
   {
-    key: 'hours',
-    label: 'Horaires d’ouverture',
+    key: 'routing',
+    label: 'Routage & Distribution',
     icon: (
       <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+      </svg>
+    )
+  },
+  {
+    key: 'triggers',
+    label: 'Messages Proactifs',
+    icon: (
+      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+      </svg>
+    )
+  },
+  {
+    key: 'prechat',
+    label: 'Formulaire Pré-Chat',
+    icon: (
+      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
     )
   },
@@ -65,11 +88,11 @@ const TABS = [
     )
   },
   {
-    key: 'team',
-    label: 'Équipe & Accès',
+    key: 'hours',
+    label: 'Horaires d’ouverture',
     icon: (
       <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     )
   },
@@ -79,6 +102,33 @@ const TABS = [
     icon: (
       <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    )
+  },
+  {
+    key: 'team',
+    label: 'Équipe & Accès',
+    icon: (
+      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+      </svg>
+    )
+  },
+  {
+    key: 'webhooks',
+    label: 'Webhooks & API',
+    icon: (
+      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+      </svg>
+    )
+  },
+  {
+    key: 'security',
+    label: 'Sécurité & RGPD',
+    icon: (
+      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
       </svg>
     )
   }
@@ -143,7 +193,7 @@ export function AdminShell({ agent }: { agent: Agent }) {
           </div>
         </div>
 
-        <nav role="tablist" aria-label="Sections d'administration" className="flex gap-1 overflow-x-auto p-2 md:flex-1 md:flex-col md:overflow-x-visible md:overflow-y-auto md:p-3 space-y-1">
+        <nav role="tablist" aria-label="Sections d'administration" className="flex gap-1 overflow-x-auto p-2 md:flex-1 md:flex-col md:overflow-x-visible md:overflow-y-auto md:p-3 space-y-0.5">
           {TABS.map((t) => {
             const active = tab === t.key;
             return (
@@ -154,7 +204,7 @@ export function AdminShell({ agent }: { agent: Agent }) {
                 onClick={() => switchTab(t.key)}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'flex items-center gap-2.5 shrink-0 whitespace-nowrap rounded-xl px-3.5 py-2 text-xs font-medium transition md:w-full md:py-2.5 md:text-left',
+                  'flex items-center gap-2.5 shrink-0 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-medium transition md:w-full md:py-2 md:text-left',
                   active
                     ? 'bg-gradient-to-r from-aurora-500/20 via-lagoon-500/15 to-transparent text-white border-l-2 border-aurora-400 shadow-sm'
                     : 'text-mist-400 hover:bg-white/5 hover:text-white'
@@ -167,12 +217,12 @@ export function AdminShell({ agent }: { agent: Agent }) {
           })}
         </nav>
 
-        <div className="hidden border-t border-white/10 p-4 md:block bg-ink-950/80">
+        <div className="hidden border-t border-white/10 p-3.5 md:block bg-ink-950/80">
           <div className="flex items-center gap-2.5">
-            <Avatar name={agent.full_name ?? agent.email} url={agent.avatar_url} size={32} />
+            <Avatar name={agent.full_name ?? agent.email} url={agent.avatar_url} size={30} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-semibold text-white">{agent.full_name ?? agent.email}</p>
-              <Link href="/inbox" className="text-[11px] text-aurora-300 hover:underline">
+              <Link href="/inbox" className="text-[10.5px] text-aurora-300 hover:underline">
                 &larr; Boîte de réception
               </Link>
             </div>
@@ -182,7 +232,7 @@ export function AdminShell({ agent }: { agent: Agent }) {
               title="Se déconnecter"
               aria-label="Se déconnecter"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                 <polyline points="16 17 21 12 16 7" />
                 <line x1="21" y1="12" x2="9" y2="12" />
@@ -197,11 +247,16 @@ export function AdminShell({ agent }: { agent: Agent }) {
         <div className={cn('mx-auto px-4 py-6 md:px-6 md:py-8', tab === 'stats' ? 'max-w-5xl' : 'max-w-3xl')}>
           {tab === 'stats' && <StatsPanel />}
           {tab === 'bot' && <BotSettingsForm />}
-          {tab === 'hours' && <BusinessHoursForm />}
+          {tab === 'routing' && <RoutingPanel />}
+          {tab === 'triggers' && <TriggersPanel />}
+          {tab === 'prechat' && <PrechatPanel />}
           {tab === 'kb' && <ArticlesPanel />}
           {tab === 'canned' && <CannedPanel agent={agent} variant="inline" />}
-          {tab === 'team' && <TeamPanel selfId={agent.id} />}
+          {tab === 'hours' && <BusinessHoursForm />}
           {tab === 'absences' && <AbsencesPanel />}
+          {tab === 'team' && <TeamPanel selfId={agent.id} />}
+          {tab === 'webhooks' && <WebhooksPanel />}
+          {tab === 'security' && <SecurityPanel />}
         </div>
       </main>
     </div>
