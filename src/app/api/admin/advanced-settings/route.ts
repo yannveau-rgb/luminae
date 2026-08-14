@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import type { Json } from '@/lib/supabase/database.types';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,7 +69,7 @@ export async function PUT(request: Request) {
   const { error: updateErr } = await db
     .from('bot_settings')
     .update({
-      suggestions: updatedStore as unknown as Record<string, unknown>[],
+      suggestions: updatedStore as unknown as Json,
       updated_at: new Date().toISOString()
     })
     .eq('id', 1);
