@@ -91,6 +91,64 @@ conséquences à garder en tête :
 
 ---
 
+## À faire — état opérationnel
+
+Ce qui bloque, indépendamment du code. Vérifié le 14 août 2026.
+
+### Migrations
+
+`supabase/migrations/0010` à `0012` ont été appliquées **à la main via le SQL
+Editor**, pas par `db push` : la table `supabase_migrations` du dashboard ne les
+connaît donc pas et un futur `db push` tentera de les rejouer. Sans dommage —
+tout y est en `create or replace`, `drop … if exists` et `if not exists`.
+
+**`0013_retention_confidentialite.sql` n'est PAS appliquée.** La colonne
+`bot_settings.privacy_url` n'existe pas en base, ce qui a deux effets muets :
+le lien de confidentialité n'apparaît jamais dans le widget (la valeur ressort
+`undefined` puis `null`), et enregistrer ce champ depuis le back-office échoue.
+À passer avant de considérer S-11 comme livré.
+
+### Variables d'environnement à poser sur Vercel
+
+`.env.local` ne part pas sur Vercel. Deux manquantes :
+
+- **`WIDGET_ALLOWED_ORIGINS`** — la seule variable qui referme une faille (S-03).
+  Non renseignée, le widget reste intégrable par n'importe quel domaine.
+- **`CRON_SECRET`** — sans elle, la purge de conservation n'est déclenchable que
+  manuellement par un admin.
+
+Ne pas ajouter `SUPABASE_JWT_SECRET` : la refonte S-05 la rend obsolète.
+
+### Réglages Supabase
+
+- **Anonymous sign-ins** à activer (Authentication → Sign In / Providers) —
+  prérequis de la refonte S-05.
+
+### Dépôt et déploiement
+
+- Branche `audit/securite-ux-design`, non poussée : Git Credential Manager
+  n'a aucun identifiant GitHub enregistré, la commande reste bloquée sur sa
+  fenêtre d'authentification. À pousser depuis un terminal interactif.
+- GitHub est lié à Supabase et à Vercel. **Quelle branche l'intégration Supabase
+  surveille reste à confirmer** — si c'est la branche de production, la fusion
+  appliquera les migrations automatiquement.
+- Le projet Supabase `dyhuirypqokaqzuzgbal` **est la production** (bandeau
+  `main PRODUCTION` du dashboard). Les migrations 0010-0012 y sont donc déjà
+  actives.
+
+### Environnement local
+
+Node n'est pas installé sur la machine. Une version portable (24.19.0) a été
+déposée dans un répertoire temporaire de session, qui sera nettoyé : une
+installation durable est nécessaire pour `npm run build`, `npm test` et le
+serveur de dev. `.claude/launch.json` suppose `npm` sur le PATH.
+
+### Traces de test en base
+
+10 lignes `visitors` sans nom ni conversation, créées par des appels de session
+pendant les vérifications. Inertes. Non supprimées faute de pouvoir les
+distinguer d'un visiteur réel ayant ouvert le widget sans écrire.
+
 ## État de l'audit sécurité / UX / design
 
 Audit complet réalisé sur le commit `84f3d43`. 35 constats, référencés `S-`
@@ -116,7 +174,7 @@ Audit complet réalisé sur le commit `84f3d43`. 35 constats, référencés `S-`
 | U-02 compteur de non-lus mort | trigger `bump_unread` (0012) + diffusion `inbox:update` systématique | `unread_count = 1` |
 | U-03 visiteurs indistinguables | route `identify`, prénom demandé après escalade | 5 cas de validation |
 | U-04 contrastes sous AA | tons 600 assombris | ratios recalculés (4,5 à 5,4:1) |
-| S-11 RGPD | conservation 12 mois, effacement par token, mentions IA + confidentialité | 2 messages avant effacement → 0 après ; purge 403 sans admin, 401 sans secret |
+| S-11 RGPD | conservation 12 mois, effacement par token, mentions IA + confidentialité | 2 messages avant effacement → 0 après ; purge 403 sans admin, 401 sans secret. **Migration 0013 non appliquée : le lien de confidentialité reste inopérant** |
 | S-13 pièces jointes | signature réelle vérifiée, orphelins purgés, contrôle d'origine | 19/19 signatures, 4/4 origines |
 | U-13 rien n'annonçait l'IA | « Assistant automatique » dans l'en-tête | rendu vérifié |
 | D-01 6 classes Tailwind inexistantes | échelle `mist` complétée, `glow`/`glow-sm` définis | bloc d'accueil à 15,05:1, ombres présentes |
