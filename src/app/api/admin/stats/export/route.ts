@@ -36,18 +36,20 @@ export async function GET(req: Request) {
         .order('created_at', { ascending: false }),
       db
         .from('messages')
-        .select('conversation_id, content, sender, created_at')
+        .select('id, conversation_id, content, sender, created_at')
         .gte('created_at', from.toISOString())
         .order('created_at', { ascending: true }),
-      db.from('message_feedback').select('conversation_id, value').gte('created_at', from.toISOString())
+      db.from('message_feedback').select('message_id, value').gte('created_at', from.toISOString())
     ]);
 
     if (convErr) throw new Error(convErr.message);
     if (msgErr) throw new Error(msgErr.message);
     if (fbErr) throw new Error(fbErr.message);
 
+    const msgToConvMap = new Map<string, string>();
     const firstMsgMap = new Map<string, string>();
     for (const m of messages ?? []) {
+      msgToConvMap.set(m.id, m.conversation_id);
       if (m.sender === 'visitor' && !firstMsgMap.has(m.conversation_id)) {
         firstMsgMap.set(m.conversation_id, m.content ?? '');
       }
@@ -55,8 +57,9 @@ export async function GET(req: Request) {
 
     const feedbackMap = new Map<string, string>();
     for (const fb of feedbacks ?? []) {
-      if (fb.conversation_id) {
-        feedbackMap.set(fb.conversation_id, fb.value === 'up' ? 'Positif (👍)' : 'Négatif (👎)');
+      const convId = msgToConvMap.get(fb.message_id);
+      if (convId) {
+        feedbackMap.set(convId, fb.value === 'up' ? 'Positif (👍)' : 'Négatif (👎)');
       }
     }
 
