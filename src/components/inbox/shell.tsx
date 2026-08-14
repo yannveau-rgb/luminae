@@ -1,9 +1,8 @@
 'use client';
 
-/** Coquille unifiée Luminae : Navigation permanente à gauche (Rail / Développé) + Conversations + Paramétrages. */
+/** Coquille unifiée Luminae : Navigation permanente à gauche (Rail / Développé / Mobile Drawer) + Conversations + Paramétrages. */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { BotOrb } from '@/components/widget/parts';
@@ -70,6 +69,7 @@ export function InboxShell({
     queryTab && ALL_ADMIN_KEYS.includes(queryTab) ? queryTab : initialView
   );
   const [railCollapsed, setRailCollapsed] = useState<boolean>(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   const [tab, setTab] = useState<'open' | 'resolved'>('open');
   const [segment, setSegment] = useState<FilterSegment>('all');
@@ -80,7 +80,6 @@ export function InboxShell({
   const [notifOpen, setNotifOpen] = useState(false);
   const [cannedOpen, setCannedOpen] = useState(false);
   const [browserPermission, setBrowserPermission] = useState<NotificationPermission | null>(null);
-  const [realtimeDown, setRealtimeDown] = useState(false);
 
   useEffect(() => {
     if (queryTab && ALL_ADMIN_KEYS.includes(queryTab)) {
@@ -136,12 +135,8 @@ export function InboxShell({
       await supabase.realtime.setAuth(accessToken);
       if (disposed) return;
 
-      const onStatus = (status: string) => {
-        if (status === 'SUBSCRIBED') setRealtimeDown(false);
-      };
-
       inbox = supabase.channel('inbox:all');
-      inbox.on('broadcast', { event: 'inbox:update' }, () => load(tab === 'resolved')).subscribe(onStatus);
+      inbox.on('broadcast', { event: 'inbox:update' }, () => load(tab === 'resolved')).subscribe();
 
       perso = supabase.channel(`agent:${agent.id}`);
       perso
@@ -159,7 +154,7 @@ export function InboxShell({
             }
           });
         })
-        .subscribe(onStatus);
+        .subscribe();
     })();
 
     return () => {
@@ -272,6 +267,7 @@ export function InboxShell({
 
   function switchNav(view: string) {
     setCurrentView(view);
+    setMobileMenuOpen(false);
     if (view === 'inbox') {
       if (selectedId) router.push(`/inbox/${selectedId}`);
       else router.push('/inbox');
@@ -283,13 +279,24 @@ export function InboxShell({
 
   return (
     <div className="flex h-[100dvh] w-screen overflow-hidden bg-mist">
+      {/* Backdrop Mobile Drawer */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-ink-950/60 backdrop-blur-xs md:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+          aria-hidden
+        />
+      )}
+
       {/* ════════════════════════════════════════════════════════════════════════
           1. RAIL DE NAVIGATION PERMANENT À GAUCHE (SLACK / INTERCOM STYLE)
          ════════════════════════════════════════════════════════════════════════ */}
       <aside
         className={cn(
-          'flex shrink-0 flex-col bg-ink-950 text-white transition-all duration-200 border-r border-white/10 z-40',
-          railCollapsed ? 'w-16' : 'w-56'
+          'flex shrink-0 flex-col bg-ink-950 text-white transition-all duration-200 border-r border-white/10',
+          'fixed inset-y-0 left-0 z-50 w-64 shadow-2xl md:static md:shadow-none md:z-40',
+          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+          railCollapsed ? 'md:w-16' : 'md:w-56'
         )}
       >
         {/* Logo Orb Luminae + Toggle Collapse */}
@@ -300,12 +307,10 @@ export function InboxShell({
             title="Luminae"
           >
             <BotOrb size={28} glow />
-            {!railCollapsed && (
-              <div className="flex flex-col truncate">
-                <span className="truncate font-display text-sm font-bold tracking-tight text-white">Luminae</span>
-                <span className="text-[10px] font-medium text-aurora-300">Support Hub</span>
-              </div>
-            )}
+            <div className={cn('flex flex-col truncate', railCollapsed && 'md:hidden')}>
+              <span className="truncate font-display text-sm font-bold tracking-tight text-white">Luminae</span>
+              <span className="text-[10px] font-medium text-aurora-300">Support Hub</span>
+            </div>
           </button>
 
           <button
@@ -326,35 +331,42 @@ export function InboxShell({
               <path d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
             </svg>
           </button>
+
+          {/* Bouton fermer sur mobile */}
+          <button
+            onClick={() => setMobileMenuOpen(false)}
+            className="flex md:hidden h-8 w-8 items-center justify-center rounded-lg text-mist-400 hover:text-white"
+            aria-label="Fermer le menu"
+          >
+            ✕
+          </button>
         </div>
 
         {/* Liste des boutons d'application et paramètres */}
         <nav className="flex-1 overflow-y-auto overflow-x-hidden p-2 space-y-3">
           {/* Bouton principal : Conversations / Inbox */}
           <div className="space-y-1">
-            {!railCollapsed && (
-              <p className="px-2 text-[9.5px] font-bold uppercase tracking-wider text-mist-400/60">
-                Messagerie
-              </p>
-            )}
+            <p className={cn('px-2 text-[9.5px] font-bold uppercase tracking-wider text-mist-400/60', railCollapsed && 'md:hidden')}>
+              Messagerie
+            </p>
             <button
               onClick={() => switchNav('inbox')}
               title={railCollapsed ? 'Conversations en direct' : undefined}
               className={cn(
                 'group flex items-center shrink-0 rounded-xl text-xs font-medium transition w-full text-left',
-                railCollapsed ? 'justify-center p-2.5' : 'justify-between gap-2.5 px-3 py-2',
+                railCollapsed ? 'justify-between px-3 py-2 md:justify-center md:p-2.5' : 'justify-between gap-2.5 px-3 py-2',
                 currentView === 'inbox'
                   ? 'bg-gradient-to-r from-lagoon-500/25 via-aurora-500/15 to-transparent text-white border-l-2 border-lagoon-400 shadow-sm font-semibold'
                   : 'text-mist-400 hover:bg-white/5 hover:text-white'
               )}
             >
-              <div className={cn('flex items-center min-w-0', railCollapsed ? 'justify-center' : 'gap-2.5')}>
+              <div className={cn('flex items-center min-w-0', railCollapsed ? 'gap-2.5 md:justify-center' : 'gap-2.5')}>
                 <span className={cn('transition', currentView === 'inbox' ? 'text-lagoon-400' : 'text-mist-400 group-hover:text-white')}>
                   <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
                 </span>
-                {!railCollapsed && <span className="truncate">Conversations</span>}
+                <span className={cn('truncate', railCollapsed && 'md:hidden')}>Conversations</span>
               </div>
 
               {counts.waiting > 0 ? (
@@ -372,11 +384,9 @@ export function InboxShell({
           {/* Menus catégorisés du Cockpit Paramétrages */}
           {TAB_CATEGORIES.map((cat) => (
             <div key={cat.title} className="space-y-1 pt-1">
-              {!railCollapsed && (
-                <p className="px-2 text-[9.5px] font-bold uppercase tracking-wider text-mist-400/60">
-                  {cat.title}
-                </p>
-              )}
+              <p className={cn('px-2 text-[9.5px] font-bold uppercase tracking-wider text-mist-400/60', railCollapsed && 'md:hidden')}>
+                {cat.title}
+              </p>
               <div className="space-y-0.5">
                 {cat.items.map((t) => {
                   const active = currentView === t.key;
@@ -387,20 +397,20 @@ export function InboxShell({
                       title={railCollapsed ? t.label : undefined}
                       className={cn(
                         'group flex items-center shrink-0 rounded-xl text-xs font-medium transition w-full text-left',
-                        railCollapsed ? 'justify-center p-2.5' : 'justify-between gap-2.5 px-3 py-2',
+                        railCollapsed ? 'justify-between px-3 py-2 md:justify-center md:p-2.5' : 'justify-between gap-2.5 px-3 py-2',
                         active
                           ? 'bg-gradient-to-r from-aurora-500/20 via-lagoon-500/15 to-transparent text-white border-l-2 border-aurora-400 shadow-sm font-semibold'
                           : 'text-mist-400 hover:bg-white/5 hover:text-white'
                       )}
                     >
-                      <div className={cn('flex items-center min-w-0', railCollapsed ? 'justify-center' : 'gap-2.5')}>
+                      <div className={cn('flex items-center min-w-0', railCollapsed ? 'gap-2.5 md:justify-center' : 'gap-2.5')}>
                         <span className={cn('transition', active ? 'text-aurora-400' : 'text-mist-400 group-hover:text-white')}>
                           {t.icon}
                         </span>
-                        {!railCollapsed && <span className="truncate">{t.label}</span>}
+                        <span className={cn('truncate', railCollapsed && 'md:hidden')}>{t.label}</span>
                       </div>
-                      {!railCollapsed && t.badge && (
-                        <span className="rounded bg-aurora-500/20 px-1.5 py-0.2 text-[9.5px] font-bold text-aurora-300">
+                      {t.badge && (
+                        <span className={cn('rounded bg-aurora-500/20 px-1.5 py-0.2 text-[9.5px] font-bold text-aurora-300', railCollapsed && 'md:hidden')}>
                           {t.badge}
                         </span>
                       )}
@@ -416,15 +426,13 @@ export function InboxShell({
         <div className="border-t border-white/10 p-2.5 bg-ink-950/80">
           <div className="flex items-center gap-2">
             <Avatar name={agent.full_name ?? agent.email} url={agent.avatar_url} size={28} online />
-            {!railCollapsed && (
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-semibold text-white">{agent.full_name ?? agent.email}</p>
-                <span className="text-[10px] text-aurora-300 font-medium">{agent.role === 'admin' ? 'Administrateur' : 'Conseiller'}</span>
-              </div>
-            )}
+            <div className={cn('min-w-0 flex-1', railCollapsed && 'md:hidden')}>
+              <p className="truncate text-xs font-semibold text-white">{agent.full_name ?? agent.email}</p>
+              <span className="text-[10px] text-aurora-300 font-medium">{agent.role === 'admin' ? 'Administrateur' : 'Conseiller'}</span>
+            </div>
             <button
               onClick={logout}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-mist-400 transition hover:bg-white/10 hover:text-white"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-mist-400 transition hover:bg-white/10 hover:text-white ml-auto"
               title="Se déconnecter"
               aria-label="Se déconnecter"
             >
@@ -451,9 +459,21 @@ export function InboxShell({
                 selectedId ? 'hidden md:flex' : 'flex'
               )}
             >
-              {/* En-tête de la liste des conversations avec stacking context élevé */}
+              {/* En-tête de la liste des conversations avec hamburger mobile */}
               <header className="relative z-30 flex items-center justify-between border-b border-mist-300/80 px-4 py-3 bg-white/80 backdrop-blur-md">
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setMobileMenuOpen(true)}
+                    className="flex h-8 w-8 items-center justify-center rounded-xl text-ink-600 hover:bg-mist transition md:hidden"
+                    title="Ouvrir le menu de navigation"
+                    aria-label="Menu de navigation"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="3" y1="12" x2="21" y2="12" />
+                      <line x1="3" y1="6" x2="21" y2="6" />
+                      <line x1="3" y1="18" x2="21" y2="18" />
+                    </svg>
+                  </button>
                   <span className="font-display text-sm font-bold tracking-tight text-ink">Boîte de réception</span>
                   <span className="rounded-full bg-lagoon-100 px-2 py-0.5 text-[10.5px] font-bold text-lagoon-700">
                     {items.length}
@@ -542,8 +562,6 @@ export function InboxShell({
                   </div>
                 </div>
               </header>
-
-
 
               {/* Barre de recherche instantanée */}
               <div className="p-3 border-b border-mist-300/60 bg-white">
@@ -773,23 +791,36 @@ export function InboxShell({
             </main>
           </>
         ) : (
-          /* ── Zone Paramétrages Admin Intégrée (Même Page, Pleine Largeur) ─────── */
+          /* ── Zone Paramétrages Admin Intégrée (Même Page, Pleine Largeur Responsive) ─────── */
           <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-mist">
-            <div className="sticky top-0 z-10 border-b border-mist-300/80 bg-white/80 px-6 py-2.5 backdrop-blur-md flex items-center justify-between gap-3 text-xs text-ink-500 shadow-sm">
+            <div className="sticky top-0 z-10 border-b border-mist-300/80 bg-white/80 px-4 py-2.5 backdrop-blur-md flex items-center justify-between gap-3 text-xs text-ink-500 shadow-sm md:px-6">
               <div className="flex items-center gap-2">
-                <span className="text-ink-400 font-medium">Cockpit Paramétrages</span>
-                <span>&rsaquo;</span>
-                <span className="font-medium text-ink-600">{activeCategory?.title}</span>
-                <span>&rsaquo;</span>
-                <span className="font-bold text-ink">{activeAdminItem?.label}</span>
+                <button
+                  onClick={() => setMobileMenuOpen(true)}
+                  className="flex h-8 w-8 items-center justify-center rounded-xl text-ink-600 hover:bg-mist transition md:hidden"
+                  title="Ouvrir le menu"
+                  aria-label="Menu"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="3" y1="12" x2="21" y2="12" />
+                    <line x1="3" y1="6" x2="21" y2="6" />
+                    <line x1="3" y1="18" x2="21" y2="18" />
+                  </svg>
+                </button>
+                <span className="text-ink-400 font-medium hidden sm:inline">Cockpit</span>
+                <span className="hidden sm:inline">&rsaquo;</span>
+                <span className="font-medium text-ink-600 hidden xs:inline">{activeCategory?.title}</span>
+                <span className="hidden xs:inline">&rsaquo;</span>
+                <span className="font-bold text-ink truncate max-w-[140px] sm:max-w-none">{activeAdminItem?.label}</span>
               </div>
 
               <button
                 onClick={() => switchNav('inbox')}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-mist-300 bg-white px-3 py-1.5 text-xs font-semibold text-ink-700 shadow-sm transition hover:bg-mist hover:text-ink"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-mist-300 bg-white px-3 py-1.5 text-xs font-semibold text-ink-700 shadow-sm transition hover:bg-mist hover:text-ink shrink-0"
               >
                 <span>&larr;</span>
-                <span>Retour aux conversations</span>
+                <span className="hidden sm:inline">Retour aux conversations</span>
+                <span className="sm:hidden">Retour</span>
               </button>
             </div>
 
