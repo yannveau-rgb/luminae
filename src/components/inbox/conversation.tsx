@@ -829,6 +829,7 @@ function AttachmentList({ attachments, light }: { attachments: Attachment[]; lig
         if (isImage && a.url) {
           return (
             <a key={a.id} href={a.url} target="_blank" rel="noopener noreferrer" className="block">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={a.url}
                 alt={a.file_name ?? 'Pièce jointe'}

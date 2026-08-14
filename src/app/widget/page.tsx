@@ -644,6 +644,7 @@ export default function WidgetPage() {
                     {m.attachments.map((a) =>
                       (a.mime_type ?? '').startsWith('image/') && a.url ? (
                         <a key={a.id} href={a.url} target="_blank" rel="noopener noreferrer">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={a.url}
                             alt={a.file_name ?? 'Pièce jointe'}
