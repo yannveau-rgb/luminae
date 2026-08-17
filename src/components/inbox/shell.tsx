@@ -17,7 +17,7 @@ import { BotSettingsForm } from '@/components/admin/bot-settings';
 import { ArticlesPanel } from '@/components/admin/articles';
 import { PrechatPanel } from '@/components/admin/prechat';
 import { TriggersPanel } from '@/components/admin/triggers';
-import { TelephonyPanel } from '@/components/admin/telephony';
+import { IntegrationsPanel } from '@/components/admin/integrations';
 import { RoutingPanel } from '@/components/admin/routing';
 import { BusinessHoursForm } from '@/components/admin/business-hours';
 import { AbsencesPanel } from '@/components/admin/absences';
@@ -832,7 +832,7 @@ export function InboxShell({
               {currentView === 'canned' && <CannedPanel agent={agent} variant="inline" />}
               {currentView === 'prechat' && <PrechatPanel />}
               {currentView === 'triggers' && <TriggersPanel />}
-              {currentView === 'telephony' && <TelephonyPanel />}
+              {(currentView === 'integrations' || currentView === 'telephony') && <IntegrationsPanel />}
               {currentView === 'routing' && <RoutingPanel />}
               {currentView === 'hours' && <BusinessHoursForm />}
               {currentView === 'absences' && <AbsencesPanel />}

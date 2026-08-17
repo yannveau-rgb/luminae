@@ -26,6 +26,14 @@ export async function GET(request: Request) {
 
   const store = ((settingsRow?.suggestions as Record<string, unknown>) ?? {}) as Record<string, unknown>;
 
+  if (section === 'integrations') {
+    return NextResponse.json({
+      telephony: store.telephony ?? null,
+      slack: store.slack ?? null,
+      integrations: store.integrations ?? null
+    });
+  }
+
   if (section && store[section]) {
     return NextResponse.json({ [section]: store[section] });
   }
@@ -35,7 +43,10 @@ export async function GET(request: Request) {
     triggers: store.triggers ?? null,
     prechat: store.prechat ?? null,
     webhooks: store.webhooks ?? null,
-    security: store.security ?? null
+    security: store.security ?? null,
+    telephony: store.telephony ?? null,
+    slack: store.slack ?? null,
+    integrations: store.integrations ?? null
   });
 }
 

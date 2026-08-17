@@ -21,7 +21,7 @@ import { RoutingPanel } from './routing';
 import { WorkflowsPanel } from './workflows';
 import { TriggersPanel } from './triggers';
 import { PrechatPanel } from './prechat';
-import { TelephonyPanel } from './telephony';
+import { IntegrationsPanel } from './integrations';
 import { WebhooksPanel } from './webhooks';
 import { SecurityPanel } from './security';
 
@@ -116,11 +116,12 @@ export const TAB_CATEGORIES: TabCategory[] = [
         )
       },
       {
-        key: 'telephony',
-        label: 'Téléphonie & Quicktalk',
+        key: 'integrations',
+        label: 'Intégrations & Connecteurs',
+        badge: 'Quicktalk / Slack',
         icon: (
           <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
           </svg>
         )
       }
@@ -455,7 +456,7 @@ export function AdminShell({
           {tab === 'canned' && <CannedPanel agent={agent} variant="inline" />}
           {tab === 'prechat' && <PrechatPanel />}
           {tab === 'triggers' && <TriggersPanel />}
-          {tab === 'telephony' && <TelephonyPanel />}
+          {(tab === 'integrations' || tab === 'telephony') && <IntegrationsPanel />}
           {tab === 'routing' && <RoutingPanel />}
           {tab === 'hours' && <BusinessHoursForm />}
           {tab === 'absences' && <AbsencesPanel />}
