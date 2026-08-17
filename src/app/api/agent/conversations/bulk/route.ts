@@ -3,6 +3,9 @@ import { AuthError, requireAgent } from '@/lib/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { broadcast } from '@/lib/broadcast';
 import { isUuid } from '@/lib/utils';
+import type { Database } from '@/lib/supabase/database.types';
+
+type ConversationUpdate = Database['public']['Tables']['conversations']['Update'];
 
 /**
  * POST /api/agent/conversations/bulk
@@ -26,7 +29,7 @@ export async function POST(req: Request) {
     const db = supabaseAdmin();
     const now = new Date().toISOString();
 
-    let patch: Record<string, unknown> = {};
+    let patch: ConversationUpdate = {};
     if (action === 'resolve' || !action) {
       patch = { status: 'resolved', resolved_at: now, updated_at: now };
     } else if (action === 'reopen') {
