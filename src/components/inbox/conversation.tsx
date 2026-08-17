@@ -545,7 +545,7 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
                   className="inline-flex items-center gap-2 rounded-xl border border-aurora-300 bg-white px-3.5 py-2 text-xs font-semibold text-lagoon-700 shadow-sm transition hover:bg-aurora-100/50 hover:shadow-glow-sm disabled:opacity-50"
                 >
                   <span>✨</span>
-                  <span>{copilotBusy ? 'Génération en cours…' : 'Suggérer une réponse Copilot (RAG)'}</span>
+                  <span>{copilotBusy ? 'Génération en cours…' : 'Suggérer une réponse Copilot IA'}</span>
                 </button>
               </div>
             ) : (
@@ -556,7 +556,7 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
                       ✨
                     </span>
                     <span className="font-display text-xs font-bold uppercase tracking-wider text-lagoon-700">
-                      Copilot Luminae · RAG Mistral
+                      Copilot Luminae · Mistral AI
                     </span>
                   </div>
                   <button
@@ -842,10 +842,10 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
         >
           <div className="w-full max-w-lg animate-slide-up rounded-2xl bg-white p-6 shadow-panel">
             <h3 id="article-modal-title" className="font-display text-base font-bold text-ink">
-              Créer un article de connaissances (RAG)
+              Créer un article de connaissances
             </h3>
             <p className="mt-1 text-xs text-ink-500">
-              Cet article sera automatiquement vectorisé et utilisé par le bot pour répondre aux questions similaires.
+              Cet article sera automatiquement indexé et utilisé par le bot pour répondre instantanément aux questions similaires.
             </p>
 
             <div className="mt-4 space-y-3">
@@ -902,7 +902,7 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
                 disabled={sending || !articleDraft.title.trim() || !articleDraft.content.trim()}
                 className="rounded-xl bg-lagoon-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-lagoon-500 disabled:opacity-40 shadow-glow-sm"
               >
-                {sending ? 'Indexation en cours…' : 'Enregistrer et indexer dans le RAG'}
+                {sending ? 'Indexation en cours…' : 'Enregistrer dans la base de connaissances'}
               </button>
             </div>
           </div>
@@ -1032,9 +1032,9 @@ function MessageRow({
             <button
               onClick={() => onMakeArticle(m)}
               className="ml-auto opacity-0 group-hover:opacity-100 text-white/90 underline-offset-2 transition hover:text-white hover:underline"
-              title="Indexer cette solution dans la base RAG"
+              title="Enregistrer cette solution dans la base de connaissances"
             >
-              + En faire un article RAG
+              + En faire un article
             </button>
           )}
         </div>

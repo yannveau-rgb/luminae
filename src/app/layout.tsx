@@ -4,9 +4,9 @@ import '@fontsource-variable/space-grotesk';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Luminae — Support client intelligent',
+  title: 'Luminae — Support Client IA Souverain & Messagerie Pro',
   description:
-    'Plateforme de conversation client : bot RAG, escalade humaine, boîte de réception agent. Données hébergées en Union Européenne.'
+    'Plateforme de conversation client : assistant IA sans hallucination, boîte de réception collaborative et escalade humaine en direct. Hébergement sécurisé en France / UE.'
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

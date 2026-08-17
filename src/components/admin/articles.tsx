@@ -96,7 +96,7 @@ export function ArticlesPanel() {
       if (j.indexError) {
         setNotice({ kind: 'warn', text: 'Article enregistré mais non indexé (Mistral indisponible). Réenregistrez-le plus tard.' });
       } else {
-        setNotice({ kind: 'ok', text: 'Article enregistré et indexé pour le RAG.' });
+        setNotice({ kind: 'ok', text: 'Article enregistré et indexé avec succès.' });
       }
       load();
     } else {
@@ -120,7 +120,7 @@ export function ArticlesPanel() {
       } else if (j.failed > 0) {
         setNotice({ kind: 'warn', text: `${j.indexed} indexé(s), ${j.failed} en échec (Mistral). Réessayez plus tard.` });
       } else {
-        setNotice({ kind: 'ok', text: `${j.indexed} article(s) indexé(s) pour le RAG.` });
+        setNotice({ kind: 'ok', text: `${j.indexed} article(s) indexé(s) pour la recherche sémantique.` });
       }
       load();
     } else {
@@ -190,7 +190,7 @@ export function ArticlesPanel() {
       if (res.ok) {
         setNotice({
           kind: 'ok',
-          text: `🎉 ${j.count} articles importés avec succès (${j.indexed} indexés pour le RAG).`
+          text: `🎉 ${j.count} articles importés avec succès (${j.indexed} indexés pour la recherche sémantique).`
         });
         setImporter(null);
         load();
@@ -219,7 +219,7 @@ export function ArticlesPanel() {
       <form onSubmit={save}>
         <SectionHeader
           title={form.id ? 'Modifier l’article' : 'Nouvel article'}
-          description="Le contenu alimente le RAG : rédigez des réponses claires et autonomes."
+          description="Le contenu alimente le bot : rédigez des réponses claires, précises et autonomes."
         />
         <Card>
           <div className="space-y-4">
@@ -275,7 +275,7 @@ export function ArticlesPanel() {
       <div className="space-y-5">
         <SectionHeader
           title="Importation & Conversion de Document"
-          description="Déposez un document complet (.md, .json, .csv, .txt) pour le convertir et l'indexer automatiquement en articles RAG."
+          description="Déposez un document complet (.md, .json, .csv, .txt) pour le convertir et l'indexer automatiquement dans la base de connaissances."
         />
 
         {importer.stage === 'upload' && (

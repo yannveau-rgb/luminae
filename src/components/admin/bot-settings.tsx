@@ -203,7 +203,7 @@ export function BotSettingsForm() {
                 <option value="detailed">Détaillée</option>
               </select>
             </Field>
-            <Field label="Seuil RAG" hint="Similarité minimale pour utiliser un article (0 à 1).">
+            <Field label="Seuil de précision IA" hint="Précision minimale requise pour répondre automatiquement (0 à 1).">
               <input
                 type="number"
                 className={inputCls}
@@ -214,7 +214,7 @@ export function BotSettingsForm() {
                 onChange={(e) => set('rag_threshold', Number(e.target.value))}
               />
             </Field>
-            <Field label="Articles considérés (top K)" hint="Entre 1 et 10.">
+            <Field label="Nombre d'articles consultés" hint="Entre 1 et 10 articles de référence par question.">
               <input
                 type="number"
                 className={inputCls}

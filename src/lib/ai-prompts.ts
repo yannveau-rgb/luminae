@@ -70,7 +70,7 @@ export function botSystemPrompt(
     articleBlock ? asData(articleBlock) : '(Aucun article de connaissances disponible)',
     ctx ? `\nContexte visiteur :\n${asData(ctx)}` : '',
     '',
-    `RÈGLE RAG : Appuie-toi sur les informations factuelles ci-dessus. Si le sujet de la question n'a AUCUN rapport avec la base de connaissances et ne permet pas d'aider le visiteur, réponds EXACTEMENT : ${NO_ANSWER}`
+    `RÈGLE D'OR D'EXACTITUDE : Appuie-toi sur les informations factuelles ci-dessus. Si le sujet de la question n'a AUCUN rapport avec la base de connaissances et ne permet pas d'aider le visiteur, réponds EXACTEMENT : ${NO_ANSWER}`
   ]
     .filter(Boolean)
     .join('\n');
