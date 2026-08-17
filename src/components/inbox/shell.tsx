@@ -81,6 +81,14 @@ export function InboxShell({
   const [cannedOpen, setCannedOpen] = useState(false);
   const [browserPermission, setBrowserPermission] = useState<NotificationPermission | null>(null);
 
+  // Multi-sélection et actions groupées (résolution par lot)
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkBusy, setBulkBusy] = useState<boolean>(false);
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [tab, segment]);
+
   useEffect(() => {
     if (queryTab && ALL_ADMIN_KEYS.includes(queryTab)) {
       setCurrentView(queryTab);
@@ -229,6 +237,45 @@ export function InboxShell({
 
     return list;
   }, [items, tab, segment, searchQuery, agent.id]);
+
+  function toggleSelect(id: string, e?: React.MouseEvent) {
+    if (e) e.stopPropagation();
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
+
+  function selectAll() {
+    if (selectedIds.length === filteredItems.length && filteredItems.length > 0) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredItems.map((i) => i.id));
+    }
+  }
+
+  function clearSelection() {
+    setSelectedIds([]);
+  }
+
+  async function executeBulkAction(action: 'resolve' | 'reopen' = 'resolve') {
+    if (selectedIds.length === 0) return;
+    setBulkBusy(true);
+    try {
+      const res = await fetch('/api/agent/conversations/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedIds, action })
+      });
+      if (res.ok) {
+        setSelectedIds([]);
+        await load(tab === 'resolved');
+      }
+    } catch (err) {
+      console.error('[bulk] error', err);
+    } finally {
+      setBulkBusy(false);
+    }
+  }
 
   // Compteurs pour chaque segment
   const counts = useMemo(() => {
@@ -679,6 +726,92 @@ export function InboxShell({
                 </div>
               )}
 
+              {/* Barre d'action groupée / Sélection globale */}
+              {filteredItems.length > 0 && (
+                <div
+                  className={cn(
+                    'flex items-center justify-between border-b px-3 py-1.5 text-xs transition-colors',
+                    selectedIds.length > 0
+                      ? 'border-lagoon-300 bg-lagoon-50/90 text-lagoon-700 shadow-sm'
+                      : 'border-mist-200 bg-mist-50/60 text-ink-500'
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={selectAll}
+                      title={
+                        selectedIds.length === filteredItems.length
+                          ? 'Tout désélectionner'
+                          : 'Tout sélectionner'
+                      }
+                      className={cn(
+                        'flex h-4 w-4 items-center justify-center rounded border transition',
+                        selectedIds.length === filteredItems.length && filteredItems.length > 0
+                          ? 'border-lagoon-600 bg-lagoon-600 text-white'
+                          : selectedIds.length > 0
+                            ? 'border-lagoon-600 bg-lagoon-100 text-lagoon-700'
+                            : 'border-mist-400 bg-white hover:border-ink-400'
+                      )}
+                    >
+                      {selectedIds.length > 0 && (
+                        <svg className="h-3 w-3 stroke-current stroke-[2.5]" viewBox="0 0 24 24" fill="none">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={selectAll}
+                      className="text-[11px] font-medium hover:text-ink transition"
+                    >
+                      {selectedIds.length > 0 ? (
+                        <span className="font-bold text-lagoon-700">
+                          {selectedIds.length} sélectionnée{selectedIds.length > 1 ? 's' : ''}
+                        </span>
+                      ) : (
+                        <span>Tout cocher ({filteredItems.length})</span>
+                      )}
+                    </button>
+                  </div>
+
+                  {selectedIds.length > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        disabled={bulkBusy}
+                        onClick={() => executeBulkAction(tab === 'resolved' ? 'reopen' : 'resolve')}
+                        className="inline-flex items-center gap-1 rounded-lg bg-lagoon-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm hover:bg-lagoon-700 active:scale-95 transition disabled:opacity-50"
+                      >
+                        {bulkBusy ? (
+                          <span>Patientez…</span>
+                        ) : tab === 'resolved' ? (
+                          <>
+                            <span>🔄</span>
+                            <span>Rouvrir ({selectedIds.length})</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>✅</span>
+                            <span>Tout résoudre ({selectedIds.length})</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={clearSelection}
+                        className="rounded-lg p-1 text-lagoon-700 hover:bg-lagoon-200/60 transition"
+                        title="Annuler la sélection"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Liste des conversations avec cartes enrichies */}
               <ul className="flex-1 overflow-y-auto divide-y divide-mist-300/40">
                 {loading && (
@@ -707,13 +840,13 @@ export function InboxShell({
 
                 {filteredItems.map((it) => {
                   const isSelected = selectedId === it.id;
+                  const isChecked = selectedIds.includes(it.id);
                   return (
-                    <li key={it.id}>
-                      <button
-                        onClick={() => router.push(`/inbox/${it.id}`)}
+                    <li key={it.id} className="relative group">
+                      <div
                         className={cn(
-                          'group relative w-full p-3.5 text-left transition-all',
-                          isSelected ? 'bg-lagoon-50/80' : 'hover:bg-mist-50 bg-white'
+                          'relative flex items-start gap-2.5 p-3 text-left transition-all',
+                          isChecked ? 'bg-lagoon-50/80' : isSelected ? 'bg-lagoon-50/50' : 'hover:bg-mist-50 bg-white'
                         )}
                       >
                         {/* Liseré indicateur d'état à gauche */}
@@ -721,14 +854,39 @@ export function InboxShell({
                           className={cn(
                             'absolute left-0 top-0 bottom-0 w-1 transition-all',
                             isSelected && 'w-1.5 bg-lagoon-600',
-                            !isSelected && it.status === 'waiting' && 'bg-sun-500',
-                            !isSelected && it.status === 'bot' && 'bg-aurora-400',
-                            !isSelected && it.status === 'assigned' && 'bg-lagoon-400',
-                            !isSelected && it.status === 'resolved' && 'bg-transparent'
+                            !isSelected && !isChecked && it.status === 'waiting' && 'bg-sun-500',
+                            !isSelected && !isChecked && it.status === 'bot' && 'bg-aurora-400',
+                            !isSelected && !isChecked && it.status === 'assigned' && 'bg-lagoon-400',
+                            !isSelected && !isChecked && it.status === 'resolved' && 'bg-transparent'
                           )}
                         />
 
-                        <div className="flex items-start gap-3">
+                        {/* Checkbox de sélection rapide */}
+                        <button
+                          type="button"
+                          onClick={(e) => toggleSelect(it.id, e)}
+                          title={isChecked ? 'Désélectionner' : 'Sélectionner'}
+                          className={cn(
+                            'mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition z-10',
+                            isChecked
+                              ? 'border-lagoon-600 bg-lagoon-600 text-white shadow-sm'
+                              : selectedIds.length > 0
+                                ? 'border-mist-400 bg-white hover:border-lagoon-500'
+                                : 'opacity-0 group-hover:opacity-100 border-mist-400 bg-white hover:border-lagoon-500'
+                          )}
+                        >
+                          {isChecked && (
+                            <svg className="h-3 w-3 stroke-current stroke-[2.5]" viewBox="0 0 24 24" fill="none">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/inbox/${it.id}`)}
+                          className="flex min-w-0 flex-1 items-start gap-2.5 text-left"
+                        >
                           <Avatar name={it.visitor_name ?? 'Visiteur'} size={34} />
 
                           <div className="min-w-0 flex-1">
@@ -767,8 +925,8 @@ export function InboxShell({
                               <UnreadBadge count={it.unread_count} />
                             </div>
                           </div>
-                        </div>
-                      </button>
+                        </button>
+                      </div>
                     </li>
                   );
                 })}
