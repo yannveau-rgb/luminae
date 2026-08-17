@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { parseUserAgent } from '@/lib/device';
+import { cn } from '@/lib/utils';
 import type { VisitorContext, WidgetSettings } from '@/lib/types';
 import {
   AgentAvatar,
@@ -114,6 +115,13 @@ export default function WidgetPage() {
   const [rgpdModalOpen, setRgpdModalOpen] = useState(false);
   const [rgpdSent, setRgpdSent] = useState(false);
   const [rgpdBusy, setRgpdBusy] = useState(false);
+
+  // Évaluation de satisfaction (CSAT post-résolution)
+  const [csatRating, setCsatRating] = useState<number | null>(null);
+  const [csatComment, setCsatComment] = useState('');
+  const [csatSent, setCsatSent] = useState(false);
+  const [csatBusy, setCsatBusy] = useState(false);
+
   const [telephony, setTelephony] = useState<{
     enabled: boolean;
     phone_number: string;
@@ -436,6 +444,31 @@ export default function WidgetPage() {
       alert('Impossible de contacter le serveur.');
     }
     setRgpdBusy(false);
+  }
+
+  async function submitCsat(rating: number, commentText?: string) {
+    if (!conversationId || csatBusy) return;
+    setCsatBusy(true);
+    try {
+      const res = await fetch('/api/widget/csat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          token: tokenRef.current,
+          rating,
+          comment: commentText ?? csatComment
+        })
+      });
+      if (res.ok) {
+        setCsatRating(rating);
+        setCsatSent(true);
+      }
+    } catch (err) {
+      console.error('[widget/csat] submit error', err);
+    } finally {
+      setCsatBusy(false);
+    }
   }
 
   const onInput = useCallback(
@@ -806,6 +839,78 @@ export default function WidgetPage() {
               </button>
             </div>
           </form>
+        )}
+
+        {/* ── Enquête de Satisfaction CSAT Post-Résolution (1 à 5 étoiles / Smileys) ── */}
+        {status === 'resolved' && (
+          <div className="mb-3 rounded-2xl border border-aurora-300/80 bg-gradient-to-b from-white to-aurora-100/40 p-3.5 shadow-panel text-center animate-slide-up">
+            {!csatSent ? (
+              <>
+                <p className="font-display text-xs font-bold text-ink-800">
+                  ✨ Comment évaluez-vous notre réponse ?
+                </p>
+                <p className="mt-0.5 text-[10.5px] text-ink-500">
+                  Votre avis nous aide à améliorer la qualité de notre assistance.
+                </p>
+
+                <div className="mt-2.5 flex items-center justify-center gap-2">
+                  {[
+                    { val: 1, emoji: '😡', label: 'Décevant' },
+                    { val: 2, emoji: '🙁', label: 'Moyen' },
+                    { val: 3, emoji: '😐', label: 'Correct' },
+                    { val: 4, emoji: '😊', label: 'Très bien' },
+                    { val: 5, emoji: '😍', label: 'Parfait !' }
+                  ].map((s) => (
+                    <button
+                      key={s.val}
+                      type="button"
+                      onClick={() => {
+                        setCsatRating(s.val);
+                        if (s.val >= 4) {
+                          submitCsat(s.val);
+                        }
+                      }}
+                      title={`${s.val}/5 — ${s.label}`}
+                      className={cn(
+                        'flex flex-col items-center gap-0.5 rounded-xl p-1.5 transition transform hover:scale-125 active:scale-95',
+                        csatRating === s.val ? 'bg-aurora-100 scale-110 shadow-sm border border-aurora-300' : 'hover:bg-mist-100'
+                      )}
+                    >
+                      <span className="text-lg">{s.emoji}</span>
+                      <span className="text-[9.5px] font-bold text-ink-600">{s.val}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {csatRating && csatRating < 4 && (
+                  <div className="mt-2.5 animate-fade-in text-left space-y-2">
+                    <input
+                      type="text"
+                      maxLength={300}
+                      value={csatComment}
+                      onChange={(e) => setCsatComment(e.target.value)}
+                      placeholder="Comment pouvons-nous faire mieux ? (facultatif)"
+                      className="w-full rounded-xl border border-mist-300 px-3 py-1.5 text-xs outline-none focus:border-lagoon-400 bg-white"
+                    />
+                    <button
+                      type="button"
+                      disabled={csatBusy}
+                      onClick={() => submitCsat(csatRating, csatComment)}
+                      className="w-full rounded-xl bg-lagoon-600 py-1.5 text-xs font-semibold text-white shadow-glow-sm transition hover:bg-lagoon-500 disabled:opacity-50"
+                    >
+                      {csatBusy ? 'Envoi…' : 'Envoyer mon avis'}
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="py-1 text-center animate-fade-in">
+                <span className="text-xl block mb-0.5">🙏</span>
+                <p className="text-xs font-bold text-ink-800">Merci pour votre retour !</p>
+                <p className="text-[10.5px] text-ink-500">Votre avis est précieux pour notre équipe.</p>
+              </div>
+            )}
+          </div>
         )}
 
         <div className="flex items-end gap-2">

@@ -267,6 +267,22 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
 
   return (
     <div className="relative">
+      {/* Bandeau de réassurance Note Privée */}
+      {noteMode && (
+        <div className="mb-2.5 flex items-center justify-between rounded-xl border border-sun-300 bg-sun-100/80 px-3.5 py-1.5 text-xs text-sun-700 shadow-sm animate-fade-in">
+          <div className="flex items-center gap-1.5 font-bold">
+            <span className="text-sm">🔒</span>
+            <span>Note d&apos;équipe confidentielle</span>
+            <span className="font-medium text-sun-600 text-[11px] hidden sm:inline">
+              · Invisible pour le client, enregistrée dans le fil d&apos;activité
+            </span>
+          </div>
+          <span className="rounded bg-sun-100 px-1.5 py-0.5 text-[10px] font-mono font-bold text-sun-700 border border-sun-300">
+            PRIVÉ
+          </span>
+        </div>
+      )}
+
       {/* Picker réponses prédéfinies flottant */}
       {pickerOpen && matches.length > 0 && (
         <div className="absolute bottom-full left-0 mb-2 w-88 overflow-hidden rounded-2xl border border-mist-300 bg-white shadow-panel z-30 animate-slide-up">
@@ -427,7 +443,10 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
             onPaste={onPaste}
             onBlur={() => onTyping(false)}
             className={cn(
-              'rich-content w-full overflow-y-auto rounded-2xl border border-mist-300 bg-white p-3.5 text-sm leading-relaxed text-ink outline-none transition focus:border-lagoon-400 focus:ring-2 focus:ring-lagoon-400/20',
+              'rich-content w-full overflow-y-auto rounded-2xl border p-3.5 text-sm leading-relaxed text-ink outline-none transition',
+              noteMode
+                ? 'border-sun-300 bg-sun-50/60 focus:border-sun-500 focus:ring-2 focus:ring-sun-300/30'
+                : 'border-mist-300 bg-white focus:border-lagoon-400 focus:ring-2 focus:ring-lagoon-400/20',
               expanded ? 'min-h-[220px] max-h-[420px]' : 'min-h-[76px] max-h-64'
             )}
             suppressContentEditableWarning
@@ -435,7 +454,7 @@ export const Composer = forwardRef<ComposerHandle, ComposerProps>(function Compo
           {empty && (
             <span className="pointer-events-none absolute left-4 top-3.5 text-sm text-ink-400 leading-relaxed">
               {noteMode
-                ? 'Rédiger une note interne pour l’équipe… tapez « / » pour insérer un modèle'
+                ? 'Rédiger une consigne ou une note pour l’équipe… tapez « / » pour insérer un modèle'
                 : 'Rédiger votre réponse au visiteur… tapez « / » pour les réponses rapides, Ctrl+V pour coller une image'}
             </span>
           )}

@@ -976,6 +976,50 @@ function MessageRow({
   const isNote = m.internal_note;
   const isBot = m.sender === 'bot';
 
+  if (isNote) {
+    return (
+      <div className="my-2.5 flex justify-center animate-fade-in">
+        <div className="w-full max-w-[88%] rounded-2xl border border-sun-300 bg-gradient-to-br from-sun-50 via-sun-50/95 to-sun-100/60 p-4 shadow-sm">
+          <div className="mb-2 flex items-center justify-between border-b border-sun-300/60 pb-2">
+            <div className="flex items-center gap-2">
+              <span className="flex h-5 w-5 items-center justify-center rounded-md bg-sun-100 text-xs border border-sun-300">
+                🔒
+              </span>
+              <span className="font-display text-xs font-bold text-sun-700">
+                Note Interne Privée
+              </span>
+              {m.agent_name && (
+                <span className="rounded-md bg-sun-100 px-1.5 py-0.5 text-[10.5px] font-semibold text-sun-700 border border-sun-300/60">
+                  {m.agent_name}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 text-[10.5px] font-mono text-sun-600">
+              <span>{formatTime(m.created_at)}</span>
+              <span className="rounded bg-sun-100 px-1.5 py-0.2 text-[9.5px] font-bold border border-sun-300/60">ÉQUIPE SEULEMENT</span>
+            </div>
+          </div>
+
+          <div className="text-xs leading-relaxed text-ink font-sans">
+            {m.content_html ? (
+              <div className="rich-content" dangerouslySetInnerHTML={{ __html: m.content_html }} />
+            ) : m.content ? (
+              <p className="whitespace-pre-wrap">{m.content}</p>
+            ) : null}
+          </div>
+
+          {m.attachments && m.attachments.length > 0 && (
+            <AttachmentList attachments={m.attachments} light={false} />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const isCsat = typeof feedback === 'string' && feedback.startsWith('csat:');
+  const csatRating = isCsat && feedback ? feedback.split(':')[1] : null;
+  const csatComment = isCsat && feedback && feedback.split(':').length > 2 ? feedback.split(':').slice(2).join(':') : null;
+
   return (
     <div className={cn('flex gap-2.5 py-1', isAgent ? 'justify-end' : 'justify-start')}>
       {isBot && (
@@ -990,18 +1034,10 @@ function MessageRow({
         className={cn(
           'group relative max-w-[72%] rounded-2xl p-3.5 text-xs leading-relaxed shadow-bubble',
           isAgent && 'rounded-br-sm bg-lagoon-600 text-white',
-          isNote && 'rounded-br-sm border border-sun-300/80 bg-sun-50 text-ink shadow-sm',
           isBot && 'rounded-bl-sm border border-aurora-300/70 bg-white text-ink shadow-sm',
           m.sender === 'visitor' && 'rounded-bl-sm border border-mist-300 bg-white text-ink'
         )}
       >
-        {isNote && (
-          <div className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-sun-700">
-            <span>🔒</span>
-            <span>Note interne d&apos;équipe</span>
-          </div>
-        )}
-
         {isBot && (
           <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-aurora-600">
             Lumi · Assistant IA
@@ -1015,18 +1051,26 @@ function MessageRow({
         ) : null}
 
         {m.attachments && m.attachments.length > 0 && (
-          <AttachmentList attachments={m.attachments} light={isAgent && !isNote} />
+          <AttachmentList attachments={m.attachments} light={isAgent} />
         )}
 
         <div
           className={cn(
             'mt-1.5 flex items-center gap-2 text-[10px]',
-            isAgent && !isNote ? 'text-white/75' : 'text-ink-400'
+            isAgent ? 'text-white/75' : 'text-ink-400'
           )}
         >
           <span>{formatTime(m.created_at)}</span>
           {isBot && feedback === 'up' && <span className="font-semibold text-lagoon-600">👍 utile</span>}
           {isBot && feedback === 'down' && <span className="font-semibold text-coral-600">👎 à revoir</span>}
+
+          {isCsat && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-sun-100 px-2 py-0.5 text-[10.5px] font-bold text-sun-700 border border-sun-300">
+              <span>⭐</span>
+              <span>CSAT {csatRating}/5</span>
+              {csatComment && <span className="font-normal italic">· « {csatComment} »</span>}
+            </span>
+          )}
 
           {isAgent && onMakeArticle && (
             <button
