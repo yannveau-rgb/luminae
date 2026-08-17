@@ -19,26 +19,27 @@ export const branding = {
   tenant: {
     name: 'Luminae',
     description:
-      'Support client, assistance conversationnelle et service après-vente pour boutiques en ligne et entreprises.'
+      'Plateforme souveraine de support client tout-en-un (Chatbot RAG IA Mistral + Boîte de réception Conseillers).'
   },
 
   /** Identité du bot (seed de bot_settings). */
   bot: {
     name: 'Lumi',
     welcomeMessage:
-      'Bonjour 👋 Je suis Lumi, votre assistant en direct. Posez-moi votre question sur nos produits, vos commandes, livraisons ou retours — je vous réponds instantanément !',
+      'Bonjour 👋 Je suis Lumi, l\'assistant officiel de Luminae. Posez-moi vos questions sur nos fonctionnalités, l\'intégration du widget sur votre site, notre IA souveraine Mistral ou nos tarifs — je vous réponds instantanément !',
     fallbackMessage:
       'Je préfère laisser un membre de l’équipe vous répondre pour ne pas vous induire en erreur. Je viens de transmettre votre demande — un agent vous répond ici très vite.',
     offlineMessage:
-      'Nos agents ne sont pas disponibles pour le moment. Votre question est bien en file d’attente, nous y répondrons dès notre retour.',
+      'Nos conseillers ne sont pas disponibles pour le moment. Votre question est bien enregistrée, nous vous répondrons dès notre retour.',
     tone: 'casual' as 'formal' | 'casual',
     replyLength: 'normal' as 'concise' | 'normal' | 'detailed',
     smallTalkEnabled: true,
     accentColor: '#0E8C7D',
     suggestions: [
-      'Où en est ma commande ?',
-      'Quels sont les délais et frais de livraison ?',
-      'Comment effectuer un retour ou un échange ?'
+      'Qu’est-ce que Luminae et comment ça marche ?',
+      'Comment intégrer le widget sur Shopify ou WordPress ?',
+      'Comment fonctionne l’IA souveraine Mistral et le RGPD ?',
+      'Comment tester la boîte de réception agent ?'
     ]
   },
 
