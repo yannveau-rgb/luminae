@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * Hub d'Intégrations & Téléphonie :
- * Quicktalk VoIP, Alertes Slack / Discord, Connecteurs CRM (HubSpot, Zapier, Make),
- * Webhooks d'événements et transferts d'emails.
+ * Hub d'Intégrations & Connecteurs :
+ * Quicktalk VoIP, E-commerce (Shopify / Stripe / WooCommerce), Alertes Slack / Discord,
+ * Connecteurs CRM (HubSpot, Zapier, Make), Webhooks d'événements.
  */
 
 import { useEffect, useState } from 'react';
@@ -26,6 +26,21 @@ export interface SlackIntegrationSettings {
   notify_on_new_conversation: boolean;
 }
 
+export interface ShopifyIntegrationSettings {
+  enabled: boolean;
+  shop_domain: string;
+  admin_access_token: string;
+  enable_ai_order_lookup: boolean;
+  enable_agent_customer_card: boolean;
+  enable_discount_generator: boolean;
+}
+
+export interface StripeIntegrationSettings {
+  enabled: boolean;
+  restricted_api_key: string;
+  show_customer_subscriptions: boolean;
+}
+
 const DEFAULT_TELEPHONY: TelephonySettings = {
   enabled: true,
   phone_number: '+33 1 89 00 00 00',
@@ -43,10 +58,28 @@ const DEFAULT_SLACK: SlackIntegrationSettings = {
   notify_on_new_conversation: false
 };
 
+const DEFAULT_SHOPIFY: ShopifyIntegrationSettings = {
+  enabled: false,
+  shop_domain: '',
+  admin_access_token: '',
+  enable_ai_order_lookup: true,
+  enable_agent_customer_card: true,
+  enable_discount_generator: false
+};
+
+const DEFAULT_STRIPE: StripeIntegrationSettings = {
+  enabled: false,
+  restricted_api_key: '',
+  show_customer_subscriptions: true
+};
+
 export function IntegrationsPanel() {
-  const [activeSubTab, setActiveSubTab] = useState<'telephony' | 'slack' | 'crm' | 'webhooks'>('telephony');
+  const [activeSubTab, setActiveSubTab] = useState<'telephony' | 'ecommerce' | 'slack' | 'crm' | 'webhooks'>('telephony');
   const [telephony, setTelephony] = useState<TelephonySettings>(DEFAULT_TELEPHONY);
   const [slack, setSlack] = useState<SlackIntegrationSettings>(DEFAULT_SLACK);
+  const [shopify, setShopify] = useState<ShopifyIntegrationSettings>(DEFAULT_SHOPIFY);
+  const [stripe, setStripe] = useState<StripeIntegrationSettings>(DEFAULT_STRIPE);
+
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
@@ -56,6 +89,8 @@ export function IntegrationsPanel() {
       .then((j) => {
         if (j.telephony) setTelephony(j.telephony);
         if (j.slack) setSlack(j.slack);
+        if (j.shopify) setShopify(j.shopify);
+        if (j.stripe) setStripe(j.stripe);
       })
       .catch(() => {});
   }, []);
@@ -94,11 +129,33 @@ export function IntegrationsPanel() {
     setBusy(false);
   }
 
+  async function submitEcommerce(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setNotice(null);
+    const res1 = await fetch('/api/admin/advanced-settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ section: 'shopify', data: shopify })
+    });
+    const res2 = await fetch('/api/admin/advanced-settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ section: 'stripe', data: stripe })
+    });
+    if (res1.ok && res2.ok) {
+      setNotice({ kind: 'ok', text: 'Paramètres E-commerce (Shopify & Stripe) enregistrés avec succès.' });
+    } else {
+      setNotice({ kind: 'error', text: 'Impossible d’enregistrer la configuration e-commerce.' });
+    }
+    setBusy(false);
+  }
+
   return (
     <div className="space-y-6">
       <SectionHeader
         title="Hub d'Intégrations & Connecteurs"
-        description="Connectez Luminae à vos canaux de communication (Téléphonie VoIP, Slack, Discord), vos outils CRM et vos automatisations métier (Zapier, Make, Webhooks)."
+        description="Connectez Luminae à vos canaux de vente (Shopify, Stripe, WooCommerce), vos outils de communication (Quicktalk, Slack) et vos automatisations métier (Zapier, Make, Webhooks)."
       />
 
       <FormNotice kind={notice?.kind ?? 'ok'} text={notice?.text ?? null} />
@@ -117,6 +174,22 @@ export function IntegrationsPanel() {
           <span>📞</span>
           <span>Téléphonie (Quicktalk)</span>
           {telephony.enabled && (
+            <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[9.5px]">Actif</span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('ecommerce')}
+          className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
+            activeSubTab === 'ecommerce'
+              ? 'bg-lagoon-600 text-white shadow-glow-sm'
+              : 'bg-white text-ink-600 border border-mist-300 hover:bg-mist'
+          }`}
+        >
+          <span>🛍️</span>
+          <span>E-commerce (Shopify / Stripe)</span>
+          {(shopify.enabled || stripe.enabled) && (
             <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[9.5px]">Actif</span>
           )}
         </button>
@@ -289,7 +362,167 @@ export function IntegrationsPanel() {
         </form>
       )}
 
-      {/* ── 2. Onglet Slack & Discord ───────────────────────────────────────── */}
+      {/* ── 2. Onglet E-commerce (Shopify & Stripe) ─────────────────────────── */}
+      {activeSubTab === 'ecommerce' && (
+        <form onSubmit={submitEcommerce} className="space-y-4">
+          {/* Connecteur Shopify */}
+          <Card className="p-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-aurora-500/10 border border-aurora-500/20 text-lg">
+                  🛍️
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-display text-sm font-bold text-ink">Boutique Shopify</h4>
+                    <span className="rounded bg-lagoon-100 px-1.5 py-0.2 text-[9.5px] font-bold text-lagoon-700">Recommandé</span>
+                  </div>
+                  <p className="text-xs text-ink-500 mt-0.5">
+                    Permet au Bot Lumi de répondre au statut des commandes (« Où est ma commande #1234 ? ») et affiche les achats du client aux conseillers.
+                  </p>
+                </div>
+              </div>
+              <label className="relative inline-flex cursor-pointer items-center shrink-0">
+                <input
+                  type="checkbox"
+                  checked={shopify.enabled}
+                  onChange={(e) => setShopify({ ...shopify, enabled: e.target.checked })}
+                  className="peer sr-only"
+                />
+                <div className="peer h-5 w-9 rounded-full bg-mist-300 after:absolute after:top-[2px] after:left-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-lagoon-600 peer-checked:after:translate-x-full" />
+              </label>
+            </div>
+
+            {shopify.enabled && (
+              <div className="mt-5 space-y-4 border-t border-mist-200 pt-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Nom de domaine de la boutique" hint="Ex: ma-boutique.myshopify.com">
+                    <input
+                      className={inputCls}
+                      value={shopify.shop_domain}
+                      onChange={(e) => setShopify({ ...shopify, shop_domain: e.target.value })}
+                      placeholder="ma-marque.myshopify.com"
+                      required
+                    />
+                  </Field>
+
+                  <Field label="Token d'accès API Admin Shopify" hint="Généré dans Paramètres > Applications > Développer des applis">
+                    <input
+                      type="password"
+                      className={inputCls}
+                      value={shopify.admin_access_token}
+                      onChange={(e) => setShopify({ ...shopify, admin_access_token: e.target.value })}
+                      placeholder="shpat_xxxxxxxxxxxxxxxxxxxx"
+                      required
+                    />
+                  </Field>
+                </div>
+
+                <div className="space-y-2 rounded-xl bg-mist-50 p-3.5 border border-mist-200 text-xs">
+                  <p className="font-bold text-ink-800 mb-1.5">Fonctionnalités E-commerce activées :</p>
+                  <label className="flex items-center gap-2 text-ink-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={shopify.enable_ai_order_lookup}
+                      onChange={(e) => setShopify({ ...shopify, enable_ai_order_lookup: e.target.checked })}
+                      className="rounded border-mist-300 text-lagoon-600"
+                    />
+                    <span>📦 <strong>Suivi de commande automatique par l&apos;IA</strong> (Recherche statut Colissimo / Chronopost sans intervention humaine)</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-ink-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={shopify.enable_agent_customer_card}
+                      onChange={(e) => setShopify({ ...shopify, enable_agent_customer_card: e.target.checked })}
+                      className="rounded border-mist-300 text-lagoon-600"
+                    />
+                    <span>👤 <strong>Historique & Panier dans l&apos;Inbox Agent</strong> (Total dépensé, statut de la dernière commande, lien Shopify direct)</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-ink-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={shopify.enable_discount_generator}
+                      onChange={(e) => setShopify({ ...shopify, enable_discount_generator: e.target.checked })}
+                      className="rounded border-mist-300 text-lagoon-600"
+                    />
+                    <span>🎟️ <strong>Bouton Code Promo 1-Clic</strong> pour dédommagement client direct dans le chat</span>
+                  </label>
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {/* Connecteur Stripe & Abonnements */}
+          <Card className="p-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lagoon-500/10 border border-lagoon-500/20 text-lg">
+                  💳
+                </div>
+                <div>
+                  <h4 className="font-display text-sm font-bold text-ink">Stripe (Paiements & Abonnements)</h4>
+                  <p className="text-xs text-ink-500 mt-0.5">
+                    Affiche le statut de l&apos;abonnement, les dernières factures et le plan souscrit par le client dans l&apos;inbox agent.
+                  </p>
+                </div>
+              </div>
+              <label className="relative inline-flex cursor-pointer items-center shrink-0">
+                <input
+                  type="checkbox"
+                  checked={stripe.enabled}
+                  onChange={(e) => setStripe({ ...stripe, enabled: e.target.checked })}
+                  className="peer sr-only"
+                />
+                <div className="peer h-5 w-9 rounded-full bg-mist-300 after:absolute after:top-[2px] after:left-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-lagoon-600 peer-checked:after:translate-x-full" />
+              </label>
+            </div>
+
+            {stripe.enabled && (
+              <div className="mt-5 space-y-4 border-t border-mist-200 pt-4">
+                <Field label="Clé API Restreinte Stripe (Lecture seule sur Customers & Subscriptions)" hint="Ex: rk_live_... ou rk_test_...">
+                  <input
+                    type="password"
+                    className={inputCls}
+                    value={stripe.restricted_api_key}
+                    onChange={(e) => setStripe({ ...stripe, restricted_api_key: e.target.value })}
+                    placeholder="rk_live_xxxxxxxxxxxxxxxxxxxx"
+                    required
+                  />
+                </Field>
+              </div>
+            )}
+          </Card>
+
+          {/* WooCommerce & PrestaShop info */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Card className="p-4 bg-mist-50 border border-mist-200">
+              <div className="flex items-center gap-2">
+                <span>🟣</span>
+                <h5 className="text-xs font-bold text-ink">WooCommerce (WordPress)</h5>
+              </div>
+              <p className="mt-1 text-[11px] text-ink-500 leading-relaxed">
+                Connectable immédiatement via le script d&apos;intégration dans le header/footer de votre thème WordPress ou via Webhook WooCommerce.
+              </p>
+            </Card>
+
+            <Card className="p-4 bg-mist-50 border border-mist-200">
+              <div className="flex items-center gap-2">
+                <span>🐧</span>
+                <h5 className="text-xs font-bold text-ink">PrestaShop & Magento</h5>
+              </div>
+              <p className="mt-1 text-[11px] text-ink-500 leading-relaxed">
+                Compatible nativement avec toutes les boutiques e-commerce par insertion du script de chat ou par passerelle Webhook API.
+              </p>
+            </Card>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <SaveButton busy={busy} />
+          </div>
+        </form>
+      )}
+
+      {/* ── 3. Onglet Slack & Discord ───────────────────────────────────────── */}
       {activeSubTab === 'slack' && (
         <form onSubmit={submitSlack} className="space-y-4">
           <Card className="p-5">
@@ -367,7 +600,7 @@ export function IntegrationsPanel() {
         </form>
       )}
 
-      {/* ── 3. Onglet CRM & Outils Métier ───────────────────────────────────── */}
+      {/* ── 4. Onglet CRM & Outils Métier ───────────────────────────────────── */}
       {activeSubTab === 'crm' && (
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -418,7 +651,7 @@ export function IntegrationsPanel() {
         </div>
       )}
 
-      {/* ── 4. Onglet Zapier, Make & Webhooks ────────────────────────────────── */}
+      {/* ── 5. Onglet Zapier, Make & Webhooks ────────────────────────────────── */}
       {activeSubTab === 'webhooks' && (
         <Card className="p-5 space-y-3">
           <div className="flex items-center justify-between">

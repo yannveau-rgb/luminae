@@ -30,6 +30,8 @@ export async function GET(request: Request) {
     return NextResponse.json({
       telephony: store.telephony ?? null,
       slack: store.slack ?? null,
+      shopify: store.shopify ?? null,
+      stripe: store.stripe ?? null,
       integrations: store.integrations ?? null
     });
   }
