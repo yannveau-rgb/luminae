@@ -9,11 +9,27 @@ type SettingsUpdate = Database['public']['Tables']['bot_settings']['Update'];
 export async function GET() {
   try {
     await requireAgent('admin');
-    const { data: settings } = await supabaseAdmin().from('bot_settings').select('*').eq('id', 1).maybeSingle();
+    const db = supabaseAdmin();
+    const { data: settings } = await db.from('bot_settings').select('*').eq('id', 1).maybeSingle();
     if (!settings) {
       return NextResponse.json({ error: 'Réglages introuvables — exécutez le seed.' }, { status: 404 });
     }
-    return NextResponse.json({ settings });
+
+    const rawStore = ((settings.suggestions as Record<string, unknown>) ?? {}) as Record<string, unknown>;
+    const companyInfo = (rawStore.company_info ?? {}) as Record<string, string>;
+    const suggestionsArray = (Array.isArray(settings.suggestions) ? settings.suggestions : rawStore.initial_suggestions ?? []) as string[];
+
+    return NextResponse.json({
+      settings: {
+        ...settings,
+        suggestions: suggestionsArray,
+        company_name: companyInfo.company_name ?? (settings as Record<string, unknown>).company_name ?? '',
+        company_activity: companyInfo.company_activity ?? (settings as Record<string, unknown>).company_activity ?? '',
+        company_description: companyInfo.company_description ?? (settings as Record<string, unknown>).company_description ?? '',
+        brand_vibe: companyInfo.brand_vibe ?? (settings as Record<string, unknown>).brand_vibe ?? '',
+        custom_instructions: companyInfo.custom_instructions ?? (settings as Record<string, unknown>).custom_instructions ?? ''
+      }
+    });
   } catch (err) {
     if (err instanceof AuthError) return NextResponse.json({ error: err.message }, { status: err.status });
     return NextResponse.json({ error: 'Impossible de charger les réglages.' }, { status: 500 });
@@ -25,6 +41,10 @@ export async function PUT(req: Request) {
   try {
     await requireAgent('admin');
     const body = await req.json().catch(() => ({}));
+    const db = supabaseAdmin();
+
+    const { data: currentSettings } = await db.from('bot_settings').select('suggestions').eq('id', 1).maybeSingle();
+    const currentStore = ((currentSettings?.suggestions as Record<string, unknown>) ?? {}) as Record<string, unknown>;
 
     const patch: SettingsUpdate = {};
     if (typeof body.bot_name === 'string') patch.bot_name = body.bot_name.trim().slice(0, 60) || 'Assistant';
@@ -37,14 +57,30 @@ export async function PUT(req: Request) {
     if (typeof body.accent_color === 'string' && /^#[0-9a-fA-F]{6}$/.test(body.accent_color.trim())) {
       patch.accent_color = body.accent_color.trim();
     }
-    if (Array.isArray(body.suggestions)) {
-      const suggestions = body.suggestions
-        .filter((s: unknown): s is string => typeof s === 'string')
-        .map((s: string) => s.trim().slice(0, 80))
-        .filter(Boolean)
-        .slice(0, 6);
-      patch.suggestions = suggestions as unknown as Json;
-    }
+
+    const suggestionsArray = Array.isArray(body.suggestions)
+      ? body.suggestions
+          .filter((s: unknown): s is string => typeof s === 'string')
+          .map((s: string) => s.trim().slice(0, 80))
+          .filter(Boolean)
+          .slice(0, 6)
+      : [];
+
+    const companyInfo = {
+      company_name: typeof body.company_name === 'string' ? body.company_name.trim().slice(0, 100) : '',
+      company_activity: typeof body.company_activity === 'string' ? body.company_activity.trim().slice(0, 150) : '',
+      company_description: typeof body.company_description === 'string' ? body.company_description.trim().slice(0, 1000) : '',
+      brand_vibe: typeof body.brand_vibe === 'string' ? body.brand_vibe.trim().slice(0, 300) : '',
+      custom_instructions: typeof body.custom_instructions === 'string' ? body.custom_instructions.trim().slice(0, 1500) : ''
+    };
+
+    const updatedStore = {
+      ...currentStore,
+      initial_suggestions: suggestionsArray,
+      company_info: companyInfo
+    };
+
+    patch.suggestions = updatedStore as unknown as Json;
     if (typeof body.rag_threshold === 'number' && body.rag_threshold >= 0 && body.rag_threshold <= 1) {
       patch.rag_threshold = body.rag_threshold;
     }

@@ -20,7 +20,17 @@ export async function runBotPipeline(conversationId: string, visitorText: string
     db.from('bot_settings').select('*').eq('id', 1).maybeSingle()
   ]);
   if (!conv || conv.status !== 'bot') return;
-  const botSettings = settings as BotSettings;
+
+  const rawStore = ((settings?.suggestions as Record<string, unknown>) ?? {}) as Record<string, unknown>;
+  const companyInfo = ((rawStore.company_info ?? rawStore.company ?? {}) as Record<string, string>);
+  const botSettings: BotSettings = {
+    ...(settings as BotSettings),
+    company_name: companyInfo.company_name ?? (settings as Record<string, unknown>)?.company_name as string ?? null,
+    company_activity: companyInfo.company_activity ?? (settings as Record<string, unknown>)?.company_activity as string ?? null,
+    company_description: companyInfo.company_description ?? (settings as Record<string, unknown>)?.company_description as string ?? null,
+    brand_vibe: companyInfo.brand_vibe ?? (settings as Record<string, unknown>)?.brand_vibe as string ?? null,
+    custom_instructions: companyInfo.custom_instructions ?? (settings as Record<string, unknown>)?.custom_instructions as string ?? null
+  };
 
   // 1) Demande explicite d'humain → escalade immédiate.
   if (wantsHumanAgent(visitorText)) {

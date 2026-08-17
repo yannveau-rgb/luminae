@@ -96,6 +96,78 @@ export function BotSettingsForm() {
             </div>
           </div>
         </Card>
+
+        {/* 🏢 Identité & Contexte de l'Entreprise */}
+        <Card className="p-5">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-lg">🏢</span>
+            <h2 className="text-sm font-bold text-ink">Identité de l&apos;Entreprise & Ambiance de Marque</h2>
+          </div>
+          <p className="text-xs text-ink-500 mb-4">
+            Renseignez les détails de votre entreprise (nom, activité, style, consignes) pour que le bot s&apos;imprègne de votre identité et adopte naturellement le ton de votre marque.
+          </p>
+
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Nom de l'entreprise / Marque" hint="Ex: Maison Nova, Shop Élite, TechCare...">
+                <input
+                  className={inputCls}
+                  value={s.company_name ?? ''}
+                  onChange={(e) => set('company_name', e.target.value)}
+                  placeholder="Maison Nova"
+                />
+              </Field>
+
+              <Field label="Secteur & Activité principale" hint="Ex: Boutique de mode en ligne, SaaS B2B, Vente de matériel...">
+                <input
+                  className={inputCls}
+                  value={s.company_activity ?? ''}
+                  onChange={(e) => set('company_activity', e.target.value)}
+                  placeholder="Boutique de prêt-à-porter et accessoires"
+                />
+              </Field>
+            </div>
+
+            <Field
+              label="Présentation & Histoire de l'entreprise"
+              hint="Ex: Marque française éco-responsable créée en 2022. Nous concevons nos produits à Paris et livrons sous 48h."
+            >
+              <textarea
+                className={inputCls}
+                rows={2}
+                value={s.company_description ?? ''}
+                onChange={(e) => set('company_description', e.target.value)}
+                placeholder="Décrivez brièvement l'entreprise et ses points forts..."
+              />
+            </Field>
+
+            <Field
+              label="Ambiance & Style de communication souhaité"
+              hint="Ex: Chaleureux, enthousiaste et dynamique / Expert, sobre et rassurant / Convivial et souriant..."
+            >
+              <input
+                className={inputCls}
+                value={s.brand_vibe ?? ''}
+                onChange={(e) => set('brand_vibe', e.target.value)}
+                placeholder="Chaleureux, bienveillant, dynamique et souriant"
+              />
+            </Field>
+
+            <Field
+              label="Consignes & Règles d'or spécifiques pour le Bot"
+              hint="Ex: Rappeler la livraison gratuite dès 50€ d'achat. Ne jamais promettre de remboursement sans retour colis. Proposer un conseiller si le client hésite."
+            >
+              <textarea
+                className={inputCls}
+                rows={3}
+                value={s.custom_instructions ?? ''}
+                onChange={(e) => set('custom_instructions', e.target.value)}
+                placeholder="Consignes particulières ou arguments clés à mettre en avant..."
+              />
+            </Field>
+          </div>
+        </Card>
+
         <Card>
           <h2 className="mb-4 text-sm font-semibold">Messages</h2>
           <div className="space-y-4">

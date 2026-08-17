@@ -19,14 +19,14 @@ export const branding = {
   tenant: {
     name: 'Luminae',
     description:
-      'Coordination d’évaluations et d’examens de candidats : supervision à distance, planification et communication.'
+      'Support client, assistance conversationnelle et service après-vente pour boutiques en ligne et entreprises.'
   },
 
   /** Identité du bot (seed de bot_settings). */
   bot: {
     name: 'Lumi',
     welcomeMessage:
-      'Bonjour 👋 Je suis Lumi, votre assistant. Posez-moi votre question sur vos évaluations, convocations ou résultats — je réponds instantanément, et un membre de l’équipe peut prendre le relais si besoin.',
+      'Bonjour 👋 Je suis Lumi, votre assistant en direct. Posez-moi votre question sur nos produits, vos commandes, livraisons ou retours — je vous réponds instantanément !',
     fallbackMessage:
       'Je préfère laisser un membre de l’équipe vous répondre pour ne pas vous induire en erreur. Je viens de transmettre votre demande — un agent vous répond ici très vite.',
     offlineMessage:
@@ -36,9 +36,9 @@ export const branding = {
     smallTalkEnabled: true,
     accentColor: '#0E8C7D',
     suggestions: [
-      'Comment se déroule un examen supervisé ?',
-      'Quand vais-je recevoir ma convocation ?',
-      'Comment récupérer mes résultats ?'
+      'Où en est ma commande ?',
+      'Quels sont les délais et frais de livraison ?',
+      'Comment effectuer un retour ou un échange ?'
     ]
   },
 

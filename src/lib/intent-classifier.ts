@@ -10,11 +10,11 @@ export interface ContactIntent {
 }
 
 export const INTENT_DEFINITIONS: Record<string, ContactIntent> = {
-  results_grades: {
-    id: 'results_grades',
-    label: 'Évaluation, Note & Résultats',
-    category: 'Pédagogie & Évaluations',
-    icon: '🎓',
+  orders_shipping: {
+    id: 'orders_shipping',
+    label: 'Commandes, Livraison & Colis',
+    category: 'E-commerce & Livraison',
+    icon: '📦',
     colorClass: 'bg-aurora-500',
     badgeClass: 'bg-aurora-500/15 text-aurora-600 border-aurora-300/40'
   },
@@ -62,8 +62,8 @@ export const INTENT_DEFINITIONS: Record<string, ContactIntent> = {
 
 const KEYWORD_RULES: { intentId: string; keywords: string[] }[] = [
   {
-    intentId: 'results_grades',
-    keywords: ['note', 'notes', 'resultat', 'resultats', 'notee', 'releve', 'examen', 'session', 'jury', 'score', 'bareme', 'candidat', 'evaluation', 'certif', 'diplome']
+    intentId: 'orders_shipping',
+    keywords: ['commande', 'commandes', 'colis', 'livraison', 'livrer', 'suivi', 'expedition', 'expedie', 'chronopost', 'colissimo', 'dhl', 'transporteur', 'reception', 'recu', 'tracking']
   },
   {
     intentId: 'pricing_subscription',

@@ -12,7 +12,7 @@ import { isUuid } from '@/lib/utils';
  * affichait N fois « Visiteur » avec le même avatar, la recherche était
  * impossible, et la variable {{contact}} des réponses rapides se résolvait
  * toujours en « Visiteur » — donc des messages impersonnels envoyés à des
- * candidats (constat U-03).
+ * visiteurs / clients (constat U-03).
  *
  * Volontairement limité au prénom : pas d'e-mail, qui demanderait une colonne
  * supplémentaire et relève de la question de conservation des données (S-11).

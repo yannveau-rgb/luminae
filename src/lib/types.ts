@@ -113,6 +113,12 @@ export interface BotSettings {
   rag_top_k: number;
   /** Politique de confidentialité affichée dans le pied du widget (S-11). */
   privacy_url: string | null;
+  /** Informations sur l'entreprise et ambiance de marque */
+  company_name?: string | null;
+  company_activity?: string | null;
+  company_description?: string | null;
+  brand_vibe?: string | null;
+  custom_instructions?: string | null;
 }
 
 export interface BusinessHours {

@@ -86,19 +86,19 @@ export const WORKFLOW_TEMPLATES: WorkflowRule[] = [
     last_executed_at: new Date(Date.now() - 14400000).toISOString()
   },
   {
-    id: 'wf_results_exam',
-    name: '🎓 Auto-Réponse Délais & Notes d’Évaluation',
-    description: 'Répond immédiatement aux questions sur les notes et les résultats avec les délais officiels (7-10j ouvrés).',
+    id: 'wf_order_tracking',
+    name: '📦 Auto-Réponse Suivi de Commande & Livraison',
+    description: 'Répond immédiatement aux questions sur les commandes et expéditions avec les délais moyens (48h à 72h ouvrées).',
     enabled: true,
     trigger: 'intent_detected',
-    trigger_value: 'results_grades',
+    trigger_value: 'orders_shipping',
     conditions: {
-      keywords: ['note', 'notes', 'resultat', 'resultats', 'releve', 'session', 'candidat']
+      keywords: ['commande', 'colis', 'livraison', 'suivi', 'expedition', 'transporteur']
     },
     actions: [
       {
         type: 'send_message',
-        payload: 'Concernant vos résultats et notes de session, ils sont généralement transmis par e-mail sous 7 à 10 jours ouvrés après votre passage, directement sur votre espace candidat.'
+        payload: 'Pour suivre votre commande, indiquez votre numéro de colis (#1234) ou votre adresse e-mail. Les commandes sont généralement expédiées sous 24h et livrées sous 48h à 72h ouvrées.'
       }
     ],
     execution_count: 53,

@@ -4,11 +4,10 @@ import { listerFichiers, removeAttachments } from './storage';
 /**
  * Conservation et effacement des données de conversation.
  *
- * La plateforme traite des échanges de candidats à des évaluations — donc des
- * données personnelles dans un contexte sensible — et la page d'accueil affiche
- * « Conformité ». Or il n'existait aucune politique de purge, aucun moyen
- * d'effacer, et aucune information sur le traitement par IA (constat S-11).
- * L'hébergement en UE, seul, ne couvre pas ces obligations.
+ * La plateforme traite des échanges de clients et visiteurs — donc des
+ * données personnelles protégées — et la page d'accueil affiche
+ * « Conformité ». Une politique de purge automatique et un droit à l'oubli
+ * supervisé garantissent la conformité RGPD.
  *
  * Deux mécanismes distincts :
  *  - `purgeExpired()`  — conservation limitée, exécutée périodiquement ;
@@ -105,13 +104,13 @@ export async function purgeExpired(): Promise<PurgeReport> {
   }
 
   // Visiteurs sans aucune conversation et inactifs depuis longtemps.
-  const { data: candidats } = await db
+  const { data: visiteursOrphelins } = await db
     .from('visitors')
     .select('id, auth_user_id')
     .lt('last_seen_at', moisAvant(ORPHAN_VISITOR_MONTHS));
 
   let visiteursSupprimes = 0;
-  for (const v of candidats ?? []) {
+  for (const v of visiteursOrphelins ?? []) {
     const { count } = await db
       .from('conversations')
       .select('id', { count: 'exact', head: true })
