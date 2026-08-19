@@ -36,6 +36,13 @@ export async function GET(request: Request) {
     });
   }
 
+  if (section === 'workflows') {
+    return NextResponse.json({
+      workflows: store.workflows ?? null,
+      visualWorkflows: store.visualWorkflows ?? null
+    });
+  }
+
   if (section && store[section]) {
     return NextResponse.json({ [section]: store[section] });
   }
@@ -48,7 +55,9 @@ export async function GET(request: Request) {
     security: store.security ?? null,
     telephony: store.telephony ?? null,
     slack: store.slack ?? null,
-    integrations: store.integrations ?? null
+    integrations: store.integrations ?? null,
+    workflows: store.workflows ?? null,
+    visualWorkflows: store.visualWorkflows ?? null
   });
 }
 
@@ -76,7 +85,8 @@ export async function PUT(request: Request) {
   const currentStore = ((settingsRow?.suggestions as Record<string, unknown>) ?? {}) as Record<string, unknown>;
   const updatedStore = {
     ...currentStore,
-    [body.section]: body.data
+    [body.section]: body.data,
+    ...(body.visualWorkflows !== undefined ? { visualWorkflows: body.visualWorkflows } : {})
   };
 
   const { error: updateErr } = await db
@@ -91,5 +101,9 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: updateErr.message }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true, [body.section]: body.data });
+  return NextResponse.json({
+    success: true,
+    [body.section]: body.data,
+    visualWorkflows: body.visualWorkflows ?? currentStore.visualWorkflows ?? null
+  });
 }

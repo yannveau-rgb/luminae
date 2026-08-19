@@ -145,7 +145,7 @@ export async function POST(req: Request) {
     // donc pas en direct pendant la phase bot.
     await broadcast('inbox:all', 'inbox:update', { conversation_id: conv.id });
 
-    // Exécution des workflows intelligents (tagging, notes internes, auto-réponses)
+    // Exécution des workflows intelligents (tagging, notes internes, auto-réponses, assignation)
     try {
       const wfResult = await evaluateWorkflows({
         conversationId: conv.id,
@@ -153,13 +153,38 @@ export async function POST(req: Request) {
         sourceUrl: conv.source_url,
       });
 
-      // Si le workflow ajoute des notes internes confidentielles pour l'équipe
+      // 1. Insertion des notes internes confidentielles générées par le workflow
       for (const note of wfResult.internalNotes) {
         await db.from('messages').insert({
           conversation_id: conv.id,
           sender: 'system',
           content: note,
           internal_note: true,
+        });
+      }
+
+      // 2. Application des tags métier via notes système d'audit
+      if (wfResult.tags.length > 0) {
+        for (const tag of wfResult.tags) {
+          await db.from('messages').insert({
+            conversation_id: conv.id,
+            sender: 'system',
+            content: `🏷️ Tag automatique : ${tag}`,
+            internal_note: true,
+          });
+        }
+      }
+
+      // 3. Assignation automatique d'un agent si configuré dans le workflow
+      if (wfResult.assignedAgentId) {
+        await db.from('conversations').update({
+          assigned_agent_id: wfResult.assignedAgentId,
+          status: 'assigned'
+        }).eq('id', conv.id);
+        await broadcast(`conv:${conv.id}`, 'conversation:update', {
+          id: conv.id,
+          assigned_agent_id: wfResult.assignedAgentId,
+          status: 'assigned'
         });
       }
     } catch (wfErr) {
