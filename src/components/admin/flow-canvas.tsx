@@ -3,17 +3,17 @@
 /**
  * Studio de Workflows Visuel No-Code Luminae (Flow Canvas).
  * Canvas interactif par nœuds et câbles courbes SVG, zoom, mini-map,
- * boutons de choix visiteur et simulateur de test en direct.
+ * surveillance et traçage temps réel des choix du visiteur,
+ * détection instantanée des erreurs/impasses et simulateur de test en direct.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   type ChoiceOption,
   type FlowEdge,
   type FlowNode,
   type FlowNodeType,
-  type VisualWorkflow,
-  VISUAL_WORKFLOW_TEMPLATES
+  type VisualWorkflow
 } from '@/lib/visual-workflow';
 import { cn } from '@/lib/utils';
 import { BotOrb } from '@/components/widget/parts';
@@ -39,19 +39,110 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const selectedNode = workflow.nodes.find((n) => n.id === selectedNodeId) ?? null;
 
-  // Simulateur de test en direct
+  // ── SURVEILLANCE TEMPS RÉEL DU TEST & TRACAGE ────────────────────────────
   const [simulatorOpen, setSimulatorOpen] = useState(false);
-  const [simHistory, setSimHistory] = useState<Array<{ sender: 'bot' | 'visitor'; text: string; options?: ChoiceOption[] }>>([]);
-  const [simCurrentNodeId, setSimCurrentNodeId] = useState<string | null>(null);
+  const [simHistory, setSimHistory] = useState<
+    Array<{ sender: 'bot' | 'visitor'; text: string; options?: ChoiceOption[]; isError?: boolean }>
+  >([]);
+  const [activeTestNodeId, setActiveTestNodeId] = useState<string | null>(null);
+  const [visitedNodeIds, setVisitedNodeIds] = useState<string[]>([]);
+  const [selectedOptionIds, setSelectedOptionIds] = useState<Record<string, string>>({}); // nodeId -> optionId
+  const [activeEdgeId, setActiveEdgeId] = useState<string | null>(null);
+  const [currentTestError, setCurrentTestError] = useState<{ nodeId: string; message: string } | null>(null);
 
   // Palette d'ajout de bloc
   const [paletteOpen, setPaletteOpen] = useState(false);
+  // Tiroir d'affichage des diagnostics
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
 
   const canvasRef = useRef<HTMLDivElement>(null);
 
+  // ── DIAGNOSTIC AUTOMATIQUE DE SANTÉ DU WORKFLOW ───────────────────────────
+  const diagnostics = useMemo(() => {
+    const issues: Array<{
+      nodeId: string;
+      nodeTitle: string;
+      kind: 'dead_end' | 'unconnected' | 'empty';
+      message: string;
+    }> = [];
+
+    for (const node of workflow.nodes) {
+      // 1. Boutons sans options ou options non reliées
+      if (node.type === 'buttons') {
+        const options = node.data.options || [];
+        if (options.length === 0) {
+          issues.push({
+            nodeId: node.id,
+            nodeTitle: node.title,
+            kind: 'empty',
+            message: 'Aucun bouton de choix configuré.'
+          });
+        }
+        for (const opt of options) {
+          const hasTarget =
+            opt.targetNodeId ||
+            workflow.edges.some((e) => e.source === node.id && e.sourceHandle === opt.id);
+          if (!hasTarget) {
+            issues.push({
+              nodeId: node.id,
+              nodeTitle: node.title,
+              kind: 'unconnected',
+              message: `Le bouton « ${opt.label} » n'est relié à aucun bloc cible.`
+            });
+          }
+        }
+      }
+
+      // 2. Blocs orphelins (aucune entrée)
+      if (node.type !== 'trigger') {
+        const hasIncoming =
+          workflow.edges.some((e) => e.target === node.id) ||
+          workflow.nodes.some((n) => n.data.options?.some((o) => o.targetNodeId === node.id));
+        if (!hasIncoming) {
+          issues.push({
+            nodeId: node.id,
+            nodeTitle: node.title,
+            kind: 'unconnected',
+            message: 'Bloc orphelin : non relié au déclencheur du workflow.'
+          });
+        }
+      }
+
+      // 3. Messages ou conditions sans sortie
+      if (['message', 'condition'].includes(node.type)) {
+        const hasOutgoing = workflow.edges.some((e) => e.source === node.id);
+        if (!hasOutgoing) {
+          issues.push({
+            nodeId: node.id,
+            nodeTitle: node.title,
+            kind: 'dead_end',
+            message: 'Impasse : ce bloc ne poursuit vers aucune action ou question.'
+          });
+        }
+      }
+    }
+
+    return issues;
+  }, [workflow.nodes, workflow.edges]);
+
+  // Centrer la vue sur un nœud spécifique
+  function focusOnNode(nodeId: string) {
+    const node = workflow.nodes.find((n) => n.id === nodeId);
+    if (!node || !canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    setPan({
+      x: rect.width / 2 - (node.position.x + 120) * zoom,
+      y: rect.height / 2 - (node.position.y + 60) * zoom
+    });
+    setSelectedNodeId(nodeId);
+  }
+
   // ── GESTION DU DÉPLACEMENT PAN DU CANVAS ──────────────────────────────────
   function handleMouseDown(e: React.MouseEvent) {
-    if ((e.target as HTMLElement).closest('.flow-node') || (e.target as HTMLElement).closest('.canvas-ui')) {
+    if (
+      (e.target as HTMLElement).closest('.flow-node') ||
+      (e.target as HTMLElement).closest('.canvas-ui')
+    ) {
       return;
     }
     setIsPanning(true);
@@ -66,7 +157,9 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
       const newY = Math.round((e.clientY - pan.y - nodeOffset.y) / zoom / 10) * 10;
       setWorkflow((prev) => ({
         ...prev,
-        nodes: prev.nodes.map((n) => (n.id === draggingNodeId ? { ...n, position: { x: Math.max(20, newX), y: Math.max(20, newY) } } : n))
+        nodes: prev.nodes.map((n) =>
+          n.id === draggingNodeId ? { ...n, position: { x: Math.max(20, newX), y: Math.max(20, newY) } } : n
+        )
       }));
     }
   }
@@ -168,34 +261,69 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
     if (!selectedNodeId) return;
     setWorkflow((prev) => ({
       ...prev,
-      nodes: prev.nodes.map((n) => (n.id === selectedNodeId ? { ...n, data: { ...n.data, ...dataUpdates } } : n))
+      nodes: prev.nodes.map((n) =>
+        n.id === selectedNodeId ? { ...n, data: { ...n.data, ...dataUpdates } } : n
+      )
     }));
   }
 
-  // ── SIMULATEUR DE WORKFLOW (« TESTER LE WORKFLOW ») ───────────────────────
+  // ── SIMULATEUR DE WORKFLOW AVEC SURVEILLANCE TEMPS RÉEL ───────────────────
   const startSimulator = useCallback(() => {
     setSimulatorOpen(true);
     setSimHistory([]);
+    setVisitedNodeIds([]);
+    setSelectedOptionIds({});
+    setActiveEdgeId(null);
+    setCurrentTestError(null);
 
     const rootNode = workflow.nodes.find((n) => n.type === 'trigger') || workflow.nodes[0];
     if (!rootNode) return;
 
     advanceSimulator(rootNode.id);
-  }, [workflow.nodes]);
+  }, [workflow.nodes, workflow.edges]);
 
   function advanceSimulator(nodeId: string) {
     const node = workflow.nodes.find((n) => n.id === nodeId);
-    if (!node) return;
-    setSimCurrentNodeId(nodeId);
+    if (!node) {
+      setCurrentTestError({
+        nodeId,
+        message: `Erreur : Le bloc cible (ID: ${nodeId}) n'existe pas.`
+      });
+      setSimHistory((prev) => [
+        ...prev,
+        {
+          sender: 'bot',
+          text: `🚨 ERREUR : Le bloc cible n'a pas été trouvé dans le flux.`,
+          isError: true
+        }
+      ]);
+      return;
+    }
+
+    setActiveTestNodeId(node.id);
+    setVisitedNodeIds((prev) => (prev.includes(node.id) ? prev : [...prev, node.id]));
+    setCurrentTestError(null);
+
+    // Auto-focus doux sur le nœud en cours d'exécution
+    focusOnNode(node.id);
 
     if (node.type === 'trigger') {
       const nextEdge = workflow.edges.find((e) => e.source === node.id);
-      if (nextEdge) advanceSimulator(nextEdge.target);
+      if (nextEdge) {
+        setActiveEdgeId(nextEdge.id);
+        setTimeout(() => advanceSimulator(nextEdge.target), 600);
+      } else {
+        setCurrentTestError({
+          nodeId: node.id,
+          message: 'Le déclencheur n’est relié à aucun bloc suivant.'
+        });
+      }
     } else if (node.type === 'message') {
       setSimHistory((prev) => [...prev, { sender: 'bot', text: node.data.message || 'Message' }]);
       const nextEdge = workflow.edges.find((e) => e.source === node.id);
       if (nextEdge) {
-        setTimeout(() => advanceSimulator(nextEdge.target), 600);
+        setActiveEdgeId(nextEdge.id);
+        setTimeout(() => advanceSimulator(nextEdge.target), 700);
       }
     } else if (node.type === 'buttons') {
       const options = node.data.options || [];
@@ -210,11 +338,17 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
     } else if (node.type === 'condition') {
       setSimHistory((prev) => [
         ...prev,
-        { sender: 'bot', text: `🔀 [Évaluation condition : ${node.title}] -> Branche active.` }
+        { sender: 'bot', text: `🔀 [Condition : ${node.title}] ➔ Branche active évaluée.` }
       ]);
       const nextEdge = workflow.edges.find((e) => e.source === node.id);
       if (nextEdge) {
-        setTimeout(() => advanceSimulator(nextEdge.target), 600);
+        setActiveEdgeId(nextEdge.id);
+        setTimeout(() => advanceSimulator(nextEdge.target), 700);
+      } else {
+        setCurrentTestError({
+          nodeId: node.id,
+          message: 'La condition n’a aucune branche de sortie connectée.'
+        });
       }
     } else if (node.type === 'action') {
       setSimHistory((prev) => [
@@ -223,24 +357,51 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
       ]);
       const nextEdge = workflow.edges.find((e) => e.source === node.id);
       if (nextEdge) {
-        setTimeout(() => advanceSimulator(nextEdge.target), 600);
+        setActiveEdgeId(nextEdge.id);
+        setTimeout(() => advanceSimulator(nextEdge.target), 700);
       }
     }
   }
 
   function handleSimChoice(option: ChoiceOption) {
+    if (!activeTestNodeId) return;
+
+    // Enregistre le choix fait pour le nœud actuel
+    setSelectedOptionIds((prev) => ({ ...prev, [activeTestNodeId]: option.id }));
     setSimHistory((prev) => [...prev, { sender: 'visitor', text: option.label }]);
+
     const directTarget = option.targetNodeId;
-    const edgeTarget = workflow.edges.find((e) => e.source === simCurrentNodeId && e.sourceHandle === option.id)?.target;
-    const targetId = directTarget || edgeTarget;
+    const matchingEdge = workflow.edges.find(
+      (e) => e.source === activeTestNodeId && e.sourceHandle === option.id
+    );
+    const targetId = directTarget || matchingEdge?.target;
+
+    if (matchingEdge) {
+      setActiveEdgeId(matchingEdge.id);
+    }
+
     if (targetId) {
-      setTimeout(() => advanceSimulator(targetId), 400);
+      setTimeout(() => advanceSimulator(targetId), 450);
+    } else {
+      // ERREUR DÉTECTÉE : Choix non connecté
+      setCurrentTestError({
+        nodeId: activeTestNodeId,
+        message: `Le bouton « ${option.label} » n'est relié à aucun bloc cible (Impasse).`
+      });
+      setSimHistory((prev) => [
+        ...prev,
+        {
+          sender: 'bot',
+          text: `🚨 IMPASSE DÉTECTÉE : Le bouton « ${option.label} » n'a pas de bloc cible relié.\nCliquez sur le bloc pour relier ce bouton.`,
+          isError: true
+        }
+      ]);
     }
   }
 
   // ── CALCUL DES CÂBLES COURBES SVG ─────────────────────────────────────────
   const nodeWidth = 240;
-  const nodeHeight = 120;
+  const nodeHeight = 130;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-white select-none overflow-hidden animate-fade-in font-sans">
@@ -268,7 +429,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
             />
           </div>
 
-          <label className="flex items-center gap-2 text-xs font-medium text-white/80 cursor-pointer ml-3 bg-white/5 rounded-xl px-2.5 py-1 border border-white/10">
+          <label className="flex items-center gap-2 text-xs font-medium text-white/80 cursor-pointer ml-2 bg-white/5 rounded-xl px-2.5 py-1 border border-white/10">
             <input
               type="checkbox"
               checked={workflow.enabled}
@@ -277,6 +438,26 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
             />
             <span>{workflow.enabled ? '🟢 En ligne' : '⚪ En pause'}</span>
           </label>
+
+          {/* Badge de Diagnostic / Santé du Workflow */}
+          <button
+            type="button"
+            onClick={() => setDiagnosticsOpen((o) => !o)}
+            className={cn(
+              'flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-semibold border transition',
+              diagnostics.length === 0
+                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                : 'border-rose-500/50 bg-rose-500/20 text-rose-300 animate-pulse'
+            )}
+            title="Vérifier la validité des branchements"
+          >
+            <span>{diagnostics.length === 0 ? '✅' : '⚠️'}</span>
+            <span>
+              {diagnostics.length === 0
+                ? '0 anomalie (Parfait)'
+                : `${diagnostics.length} anomalie${diagnostics.length > 1 ? 's' : ''}`}
+            </span>
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -336,7 +517,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
           <svg className="absolute inset-0 w-[5000px] h-[5000px] pointer-events-none overflow-visible">
             <defs>
               <marker
-                id="flow-arrow"
+                id="flow-arrow-default"
                 viewBox="0 0 10 10"
                 refX="7"
                 refY="5"
@@ -346,17 +527,37 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
               >
                 <path d="M 0 1 L 8 5 L 0 9 z" fill="#38bdf8" />
               </marker>
-              <linearGradient id="cable-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+
+              <marker
+                id="flow-arrow-active"
+                viewBox="0 0 10 10"
+                refX="7"
+                refY="5"
+                markerWidth="7"
+                markerHeight="7"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 1 L 8 5 L 0 9 z" fill="#10b981" />
+              </marker>
+
+              <linearGradient id="cable-gradient-default" x1="0%" y1="0%" x2="0%" y2="100%">
                 <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.8" />
                 <stop offset="100%" stopColor="#818cf8" stopOpacity="0.8" />
               </linearGradient>
+
+              <linearGradient id="cable-gradient-active" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#10b981" stopOpacity="1" />
+                <stop offset="100%" stopColor="#34d399" stopOpacity="1" />
+              </linearGradient>
             </defs>
 
-            {/* Rendu des flèches entre les nœuds */}
+            {/* Rendu des flèches entre les nœuds avec surbrillance temps réel */}
             {workflow.edges.map((edge) => {
               const src = workflow.nodes.find((n) => n.id === edge.source);
               const tgt = workflow.nodes.find((n) => n.id === edge.target);
               if (!src || !tgt) return null;
+
+              const isEdgeActive = activeEdgeId === edge.id;
 
               const x1 = src.position.x + nodeWidth / 2;
               const y1 = src.position.y + nodeHeight;
@@ -371,13 +572,23 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                   <path
                     d={pathD}
                     fill="none"
-                    stroke="url(#cable-gradient)"
-                    strokeWidth="2.5"
-                    markerEnd="url(#flow-arrow)"
-                    className="transition hover:stroke-sun-500 hover:stroke-[3.5px] cursor-pointer"
+                    stroke={isEdgeActive ? 'url(#cable-gradient-active)' : 'url(#cable-gradient-default)'}
+                    strokeWidth={isEdgeActive ? '4.5' : '2.5'}
+                    markerEnd={isEdgeActive ? 'url(#flow-arrow-active)' : 'url(#flow-arrow-default)'}
+                    className={cn(
+                      'transition-all duration-300 cursor-pointer',
+                      isEdgeActive && 'filter drop-shadow-[0_0_10px_#10b981]',
+                      !isEdgeActive && 'hover:stroke-sun-500 hover:stroke-[3.5px]'
+                    )}
                   />
                   {/* Point lumineux interactif */}
-                  <circle cx={(x1 + x2) / 2} cy={(y1 + y2) / 2} r="3" fill="#38bdf8" className="animate-pulse" />
+                  <circle
+                    cx={(x1 + x2) / 2}
+                    cy={(y1 + y2) / 2}
+                    r={isEdgeActive ? '5' : '3'}
+                    fill={isEdgeActive ? '#10b981' : '#38bdf8'}
+                    className={isEdgeActive ? 'animate-ping' : 'animate-pulse'}
+                  />
                 </g>
               );
             })}
@@ -387,6 +598,12 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
           <div className="absolute inset-0 pointer-events-auto">
             {workflow.nodes.map((node) => {
               const isSelected = selectedNodeId === node.id;
+              const isTestActive = activeTestNodeId === node.id;
+              const isVisited = visitedNodeIds.includes(node.id);
+              const nodeIssues = diagnostics.filter((d) => d.nodeId === node.id);
+              const hasIssues = nodeIssues.length > 0;
+              const isError = currentTestError?.nodeId === node.id;
+
               return (
                 <div
                   key={node.id}
@@ -400,12 +617,35 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                     width: `${nodeWidth}px`
                   }}
                   className={cn(
-                    'flow-node absolute rounded-2xl border transition-all duration-75 shadow-2xl backdrop-blur-md cursor-pointer select-none',
-                    isSelected
-                      ? 'border-lagoon-400 ring-2 ring-lagoon-400/50 bg-slate-900/95 scale-102 z-20'
-                      : 'border-white/10 bg-slate-900/85 hover:border-white/30 z-10'
+                    'flow-node absolute rounded-2xl border transition-all duration-150 shadow-2xl backdrop-blur-md cursor-pointer select-none',
+                    // Mode actif lors du test en direct
+                    isTestActive && 'ring-4 ring-sky-400 border-sky-400 bg-slate-900 scale-103 z-30 shadow-[0_0_25px_#38bdf866]',
+                    // Erreur détectée sur ce nœud
+                    isError && 'ring-4 ring-rose-500 border-rose-500 bg-rose-950/40 z-30 animate-pulse',
+                    // Nœud visité avec succès
+                    isVisited && !isTestActive && !isError && 'border-emerald-500/80 bg-slate-900/95 ring-1 ring-emerald-500/40',
+                    // Sélectionné pour édition
+                    isSelected && !isTestActive && !isError && 'border-lagoon-400 ring-2 ring-lagoon-400/50 bg-slate-900/95 scale-102 z-20',
+                    // Normal
+                    !isSelected && !isTestActive && !isVisited && !isError && 'border-white/10 bg-slate-900/85 hover:border-white/30 z-10'
                   )}
                 >
+                  {/* Badge de surveillance en direct */}
+                  {isTestActive && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-sky-500 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-950 shadow-lg flex items-center gap-1 animate-pulse">
+                      <span>🟢</span>
+                      <span>En cours d'exécution</span>
+                    </div>
+                  )}
+
+                  {/* Badge d'erreur de surveillance */}
+                  {isError && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-rose-600 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white shadow-lg flex items-center gap-1">
+                      <span>🚨</span>
+                      <span>Impasse / Erreur</span>
+                    </div>
+                  )}
+
                   {/* En-tête coloré par type de nœud */}
                   <div
                     className={cn(
@@ -428,17 +668,27 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                       <span className="truncate">{node.title}</span>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteNode(node.id);
-                      }}
-                      className="text-white/40 hover:text-rose-400 rounded px-1 transition text-[11px]"
-                      title="Supprimer ce bloc"
-                    >
-                      ✕
-                    </button>
+                    <div className="flex items-center gap-1">
+                      {hasIssues && (
+                        <span
+                          title={nodeIssues.map((i) => i.message).join('\n')}
+                          className="rounded-full bg-rose-500/30 text-rose-300 text-[10px] px-1.5 py-0.2 border border-rose-500/50"
+                        >
+                          ⚠️
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteNode(node.id);
+                        }}
+                        className="text-white/40 hover:text-rose-400 rounded px-1 transition text-[11px]"
+                        title="Supprimer ce bloc"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
 
                   {/* Corps du bloc */}
@@ -466,15 +716,33 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                       <div className="space-y-1.5">
                         <p className="text-[11px] font-medium text-white/70 line-clamp-1">{node.data.question}</p>
                         <div className="space-y-1">
-                          {(node.data.options || []).map((opt) => (
-                            <div
-                              key={opt.id}
-                              className="flex items-center justify-between rounded-lg bg-sky-500/15 px-2 py-1 text-[10.5px] font-medium text-sky-200 border border-sky-500/30"
-                            >
-                              <span className="truncate">{opt.label}</span>
-                              <span className="text-[9px] text-sky-400">&rarr;</span>
-                            </div>
-                          ))}
+                          {(node.data.options || []).map((opt) => {
+                            const isOptionChosen = selectedOptionIds[node.id] === opt.id;
+                            const isOptConnected =
+                              opt.targetNodeId ||
+                              workflow.edges.some((e) => e.source === node.id && e.sourceHandle === opt.id);
+
+                            return (
+                              <div
+                                key={opt.id}
+                                className={cn(
+                                  'flex items-center justify-between rounded-lg px-2 py-1 text-[10.5px] font-medium border transition-all',
+                                  // Surbrillance temps réel si ce choix a été cliqué dans le test
+                                  isOptionChosen
+                                    ? 'bg-emerald-500 text-slate-950 font-bold border-emerald-300 shadow-[0_0_12px_#10b981]'
+                                    : isOptConnected
+                                      ? 'bg-sky-500/15 text-sky-200 border-sky-500/30'
+                                      : 'bg-rose-500/20 text-rose-200 border-rose-500/40 border-dashed'
+                                )}
+                              >
+                                <span className="truncate flex items-center gap-1">
+                                  {isOptionChosen && <span>✓</span>}
+                                  <span>{opt.label}</span>
+                                </span>
+                                <span className="text-[9px]">{isOptConnected ? '➔' : '⚠️ Non relié'}</span>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -493,7 +761,12 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                   </div>
 
                   {/* Connecteur de sortie inférieur */}
-                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex items-center justify-center h-4 w-4 rounded-full bg-sky-500 border-2 border-slate-900 shadow-md">
+                  <div
+                    className={cn(
+                      'absolute -bottom-2 left-1/2 -translate-x-1/2 flex items-center justify-center h-4 w-4 rounded-full border-2 border-slate-900 shadow-md',
+                      isVisited ? 'bg-emerald-500' : 'bg-sky-500'
+                    )}
+                  >
                     <span className="h-1.5 w-1.5 rounded-full bg-white" />
                   </div>
                 </div>
@@ -560,6 +833,47 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
           </div>
         </div>
       </div>
+
+      {/* ── TIROIR D'AFFICHAGE DES DIAGNOSTICS & ANOMALIES (EN HAUT À GAUCHE) ── */}
+      {diagnosticsOpen && (
+        <div className="absolute top-16 left-6 z-50 w-84 sm:w-96 rounded-3xl border border-rose-500/30 bg-slate-900/95 shadow-2xl backdrop-blur-2xl p-4 space-y-3 animate-slide-up">
+          <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">🔍</span>
+              <h3 className="font-display text-xs font-bold text-white">Diagnostics & Impasses</h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDiagnosticsOpen(false)}
+              className="rounded-lg p-1 text-white/40 hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="max-h-64 overflow-y-auto space-y-2 text-xs">
+            {diagnostics.length === 0 ? (
+              <p className="text-emerald-300 py-3 text-center">
+                ✨ Aucune anomalie détectée ! Tous vos blocs et boutons sont correctement reliés.
+              </p>
+            ) : (
+              diagnostics.map((d, i) => (
+                <div
+                  key={i}
+                  onClick={() => focusOnNode(d.nodeId)}
+                  className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-2.5 cursor-pointer hover:bg-rose-500/20 transition space-y-1"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-rose-300">{d.nodeTitle}</span>
+                    <span className="text-[10px] text-sky-300 underline">Voir le bloc &rarr;</span>
+                  </div>
+                  <p className="text-[11px] text-white/70">{d.message}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── TIROIR D'ÉDITION DU BLOC SÉLECTIONNÉ (À DROITE) ─────────────────── */}
       {selectedNode && (
@@ -673,7 +987,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                             }}
                             className="flex-1 rounded-lg border border-white/15 bg-slate-900 px-2 py-1 text-[11px] text-sky-300"
                           >
-                            <option value="">-- Aucun nœud connecté --</option>
+                            <option value="">-- Aucun nœud connecté (Impasse) --</option>
                             {workflow.nodes
                               .filter((n) => n.id !== selectedNode.id)
                               .map((n) => (
@@ -814,13 +1128,16 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
         </div>
       )}
 
-      {/* ── SIMULATEUR DE WORKFLOW EN DIRECT (« TESTER LE WORKFLOW ») ───────── */}
+      {/* ── SIMULATEUR DE WORKFLOW EN DIRECT AVEC SURVEILLANCE TEMPS RÉEL ──── */}
       {simulatorOpen && (
-        <div className="fixed top-16 right-6 z-50 w-84 sm:w-96 rounded-3xl border border-white/20 bg-slate-900/95 shadow-2xl backdrop-blur-2xl p-4 space-y-3 animate-slide-up flex flex-col max-h-[75vh]">
+        <div className="fixed top-16 right-6 z-50 w-84 sm:w-96 rounded-3xl border border-white/20 bg-slate-900/95 shadow-2xl backdrop-blur-2xl p-4 space-y-3 animate-slide-up flex flex-col max-h-[78vh]">
           <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
             <div className="flex items-center gap-2">
               <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-500 text-xs">🧪</span>
-              <h3 className="font-display text-xs font-bold text-white">Simulateur Visiteur en Direct</h3>
+              <div>
+                <h3 className="font-display text-xs font-bold text-white">Surveillance & Test en Direct</h3>
+                <p className="text-[10px] text-sky-400">Le nœud actif brille en direct sur le canvas</p>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -832,7 +1149,12 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
               </button>
               <button
                 type="button"
-                onClick={() => setSimulatorOpen(false)}
+                onClick={() => {
+                  setSimulatorOpen(false);
+                  setActiveTestNodeId(null);
+                  setActiveEdgeId(null);
+                  setCurrentTestError(null);
+                }}
                 className="rounded-lg p-1 text-white/40 hover:text-white"
               >
                 ✕
@@ -840,15 +1162,28 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
             </div>
           </div>
 
+          {/* Bandeau d'alerte si une erreur est détectée */}
+          {currentTestError && (
+            <div className="rounded-xl border border-rose-500/50 bg-rose-500/20 p-2.5 text-xs text-rose-200 flex items-start gap-2 animate-shake">
+              <span>🚨</span>
+              <div className="flex-1">
+                <span className="font-bold block">Anomalie détectée :</span>
+                <span className="text-[11px] leading-tight block">{currentTestError.message}</span>
+              </div>
+            </div>
+          )}
+
           <div className="flex-1 overflow-y-auto space-y-2.5 p-1 text-xs">
             {simHistory.map((item, idx) => (
               <div key={idx} className={cn('flex flex-col gap-1', item.sender === 'visitor' ? 'items-end' : 'items-start')}>
                 <div
                   className={cn(
-                    'rounded-2xl px-3.5 py-2.5 max-w-[85%] leading-relaxed',
+                    'rounded-2xl px-3.5 py-2.5 max-w-[88%] leading-relaxed',
                     item.sender === 'visitor'
-                      ? 'bg-blue-600 text-white font-medium'
-                      : 'bg-slate-800 text-white/90 border border-white/10'
+                      ? 'bg-blue-600 text-white font-medium shadow-sm'
+                      : item.isError
+                        ? 'bg-rose-950 border border-rose-500 text-rose-200'
+                        : 'bg-slate-800 text-white/90 border border-white/10'
                   )}
                 >
                   <p className="whitespace-pre-wrap">{item.text}</p>
@@ -862,9 +1197,10 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                         key={opt.id}
                         type="button"
                         onClick={() => handleSimChoice(opt)}
-                        className="w-full rounded-xl border border-sky-500/40 bg-sky-500/15 py-2 px-3 text-xs font-semibold text-sky-200 hover:bg-sky-500/30 hover:border-sky-400 transition active:scale-98 text-left"
+                        className="w-full rounded-xl border border-sky-500/40 bg-sky-500/15 py-2 px-3 text-xs font-semibold text-sky-200 hover:bg-sky-500/30 hover:border-sky-400 transition active:scale-98 text-left flex items-center justify-between"
                       >
-                        {opt.label}
+                        <span>{opt.label}</span>
+                        <span className="text-[10px] text-sky-400">Choisir ➔</span>
                       </button>
                     ))}
                   </div>
