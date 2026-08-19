@@ -69,6 +69,8 @@ export function InboxShell({
     queryTab && ALL_ADMIN_KEYS.includes(queryTab) ? queryTab : initialView
   );
   const [railCollapsed, setRailCollapsed] = useState<boolean>(true);
+  const [railHovered, setRailHovered] = useState<boolean>(false);
+  const isExpanded = !railCollapsed || railHovered;
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   const [tab, setTab] = useState<'open' | 'resolved'>('open');
@@ -339,11 +341,13 @@ export function InboxShell({
           1. RAIL DE NAVIGATION PERMANENT À GAUCHE (SLACK / INTERCOM STYLE)
          ════════════════════════════════════════════════════════════════════════ */}
       <aside
+        onMouseEnter={() => setRailHovered(true)}
+        onMouseLeave={() => setRailHovered(false)}
         className={cn(
-          'flex shrink-0 flex-col bg-ink-950 text-white transition-all duration-200 border-r border-white/10',
+          'flex shrink-0 flex-col bg-ink-950 text-white transition-all duration-200 ease-out border-r border-white/10',
           'fixed inset-y-0 left-0 z-50 w-64 shadow-2xl md:static md:shadow-none md:z-40',
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
-          railCollapsed ? 'md:w-16' : 'md:w-56'
+          isExpanded ? 'md:w-56' : 'md:w-16'
         )}
       >
         {/* Logo Orb Luminae + Toggle Collapse */}
@@ -354,7 +358,7 @@ export function InboxShell({
             title="Luminae"
           >
             <BotOrb size={28} glow />
-            <div className={cn('flex flex-col truncate', railCollapsed && 'md:hidden')}>
+            <div className={cn('flex flex-col truncate', !isExpanded && 'md:hidden')}>
               <span className="truncate font-display text-sm font-bold tracking-tight text-white">Luminae</span>
               <span className="text-[10px] font-medium text-aurora-300">Support Hub</span>
             </div>
@@ -363,8 +367,8 @@ export function InboxShell({
           <button
             onClick={() => setRailCollapsed((c) => !c)}
             className="hidden md:flex h-7 w-7 items-center justify-center rounded-lg text-mist-400 transition hover:bg-white/10 hover:text-white"
-            title={railCollapsed ? 'Développer le menu' : 'Réduire en barre d’icônes'}
-            aria-label="Réduire/Développer"
+            title={!railCollapsed ? 'Détacher (repli automatique au survol)' : 'Épingler le menu ouvert'}
+            aria-label={!railCollapsed ? 'Détacher le menu' : 'Épingler le menu'}
           >
             <svg
               width="14"
@@ -373,7 +377,7 @@ export function InboxShell({
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
-              className={cn('transition transform', railCollapsed ? 'rotate-180' : '')}
+              className={cn('transition transform', !railCollapsed ? '' : 'rotate-180')}
             >
               <path d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
             </svg>
@@ -393,27 +397,27 @@ export function InboxShell({
         <nav className="flex-1 overflow-y-auto overflow-x-hidden p-2 space-y-3">
           {/* Bouton principal : Conversations / Inbox */}
           <div className="space-y-1">
-            <p className={cn('px-2 text-[9.5px] font-bold uppercase tracking-wider text-mist-400/60', railCollapsed && 'md:hidden')}>
+            <p className={cn('px-2 text-[9.5px] font-bold uppercase tracking-wider text-mist-400/60', !isExpanded && 'md:hidden')}>
               Messagerie
             </p>
             <button
               onClick={() => switchNav('inbox')}
-              title={railCollapsed ? 'Conversations en direct' : undefined}
+              title={!isExpanded ? 'Conversations en direct' : undefined}
               className={cn(
                 'group flex items-center shrink-0 rounded-xl text-xs font-medium transition w-full text-left',
-                railCollapsed ? 'justify-between px-3 py-2 md:justify-center md:p-2.5' : 'justify-between gap-2.5 px-3 py-2',
+                !isExpanded ? 'justify-between px-3 py-2 md:justify-center md:p-2.5' : 'justify-between gap-2.5 px-3 py-2',
                 currentView === 'inbox'
                   ? 'bg-gradient-to-r from-lagoon-500/25 via-aurora-500/15 to-transparent text-white border-l-2 border-lagoon-400 shadow-sm font-semibold'
                   : 'text-mist-400 hover:bg-white/5 hover:text-white'
               )}
             >
-              <div className={cn('flex items-center min-w-0', railCollapsed ? 'gap-2.5 md:justify-center' : 'gap-2.5')}>
+              <div className={cn('flex items-center min-w-0', !isExpanded ? 'gap-2.5 md:justify-center' : 'gap-2.5')}>
                 <span className={cn('transition', currentView === 'inbox' ? 'text-lagoon-400' : 'text-mist-400 group-hover:text-white')}>
                   <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
                 </span>
-                <span className={cn('truncate', railCollapsed && 'md:hidden')}>Conversations</span>
+                <span className={cn('truncate', !isExpanded && 'md:hidden')}>Conversations</span>
               </div>
 
               {counts.waiting > 0 ? (
@@ -431,7 +435,7 @@ export function InboxShell({
           {/* Menus catégorisés du Cockpit Paramétrages */}
           {TAB_CATEGORIES.map((cat) => (
             <div key={cat.title} className="space-y-1 pt-1">
-              <p className={cn('px-2 text-[9.5px] font-bold uppercase tracking-wider text-mist-400/60', railCollapsed && 'md:hidden')}>
+              <p className={cn('px-2 text-[9.5px] font-bold uppercase tracking-wider text-mist-400/60', !isExpanded && 'md:hidden')}>
                 {cat.title}
               </p>
               <div className="space-y-0.5">
@@ -441,23 +445,23 @@ export function InboxShell({
                     <button
                       key={t.key}
                       onClick={() => switchNav(t.key)}
-                      title={railCollapsed ? t.label : undefined}
+                      title={!isExpanded ? t.label : undefined}
                       className={cn(
                         'group flex items-center shrink-0 rounded-xl text-xs font-medium transition w-full text-left',
-                        railCollapsed ? 'justify-between px-3 py-2 md:justify-center md:p-2.5' : 'justify-between gap-2.5 px-3 py-2',
+                        !isExpanded ? 'justify-between px-3 py-2 md:justify-center md:p-2.5' : 'justify-between gap-2.5 px-3 py-2',
                         active
                           ? 'bg-gradient-to-r from-aurora-500/20 via-lagoon-500/15 to-transparent text-white border-l-2 border-aurora-400 shadow-sm font-semibold'
                           : 'text-mist-400 hover:bg-white/5 hover:text-white'
                       )}
                     >
-                      <div className={cn('flex items-center min-w-0', railCollapsed ? 'gap-2.5 md:justify-center' : 'gap-2.5')}>
+                      <div className={cn('flex items-center min-w-0', !isExpanded ? 'gap-2.5 md:justify-center' : 'gap-2.5')}>
                         <span className={cn('transition', active ? 'text-aurora-400' : 'text-mist-400 group-hover:text-white')}>
                           {t.icon}
                         </span>
-                        <span className={cn('truncate', railCollapsed && 'md:hidden')}>{t.label}</span>
+                        <span className={cn('truncate', !isExpanded && 'md:hidden')}>{t.label}</span>
                       </div>
                       {t.badge && (
-                        <span className={cn('rounded bg-aurora-500/20 px-1.5 py-0.2 text-[9.5px] font-bold text-aurora-300', railCollapsed && 'md:hidden')}>
+                        <span className={cn('rounded bg-aurora-500/20 px-1.5 py-0.2 text-[9.5px] font-bold text-aurora-300', !isExpanded && 'md:hidden')}>
                           {t.badge}
                         </span>
                       )}
@@ -473,7 +477,7 @@ export function InboxShell({
         <div className="border-t border-white/10 p-2.5 bg-ink-950/80">
           <div className="flex items-center gap-2">
             <Avatar name={agent.full_name ?? agent.email} url={agent.avatar_url} size={28} online />
-            <div className={cn('min-w-0 flex-1', railCollapsed && 'md:hidden')}>
+            <div className={cn('min-w-0 flex-1', !isExpanded && 'md:hidden')}>
               <p className="truncate text-xs font-semibold text-white">{agent.full_name ?? agent.email}</p>
               <span className="text-[10px] text-aurora-300 font-medium">{agent.role === 'admin' ? 'Administrateur' : 'Conseiller'}</span>
             </div>
