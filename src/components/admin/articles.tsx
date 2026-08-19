@@ -1,6 +1,11 @@
 'use client';
 
-/** Base de connaissances : création, édition, indexation RAG et import de documents complets. */
+/**
+ * Base de connaissances professionnelle :
+ * Éditeur Markdown avec prévisualisation en direct, barre d'outils riche,
+ * assistant IA Mistral (polissage, génération FAQ, tags), import/export complet,
+ * recherche instantanée et filtres par catégories.
+ */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card, EmptyState, Field, FormNotice, SaveButton, SectionHeader, SkeletonList, inputCls } from './parts';
@@ -45,6 +50,8 @@ export function ArticlesPanel() {
   const [dragActive, setDragActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCat, setSelectedCat] = useState<string>('all');
+  const [previewTab, setPreviewTab] = useState<'edit' | 'preview'>('edit');
+  const [aiBusy, setAiBusy] = useState<'improve' | 'faq' | 'tags' | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const unindexedCount = articles.filter((a) => !a.indexed).length;
@@ -82,6 +89,7 @@ export function ArticlesPanel() {
       const j = await res.json();
       const a = j.article;
       setForm({ id: a.id, title: a.title, category: a.category ?? '', tags: (a.tags ?? []).join(', '), content: a.content });
+      setPreviewTab('edit');
       setNotice(null);
     } else {
       setNotice({ kind: 'error', text: 'Impossible de charger l’article.' });
@@ -118,6 +126,71 @@ export function ArticlesPanel() {
       setNotice({ kind: 'error', text: j.error ?? 'L’enregistrement a échoué.' });
     }
     setBusy(false);
+  }
+
+  async function runAiAssist(mode: 'improve' | 'faq' | 'tags') {
+    if (!form || !form.content.trim() || aiBusy) return;
+    setAiBusy(mode);
+    try {
+      const res = await fetch('/api/admin/articles/ai-assist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, title: form.title, content: form.content })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (mode === 'improve' && data.result) {
+          setForm({ ...form, content: data.result });
+          setNotice({ kind: 'ok', text: '✨ Article amélioré et structuré avec succès par l’IA Mistral.' });
+        } else if (mode === 'faq' && data.result) {
+          setForm({ ...form, content: `${form.content.trim()}\n\n---\n\n## ❓ Questions Fréquentes Associées\n\n${data.result}` });
+          setNotice({ kind: 'ok', text: '💡 FAQ générée et ajoutée à l’article.' });
+        } else if (mode === 'tags') {
+          setForm({
+            ...form,
+            category: data.category || form.category,
+            tags: data.tags ? (form.tags ? `${form.tags}, ${data.tags}` : data.tags) : form.tags
+          });
+          setNotice({ kind: 'ok', text: '🏷️ Catégorie et mots-clés suggérés avec succès.' });
+        }
+      } else {
+        setNotice({ kind: 'error', text: data.error || 'Erreur lors de l’assistance IA.' });
+      }
+    } catch {
+      setNotice({ kind: 'error', text: 'Impossible de contacter l’assistance IA.' });
+    } finally {
+      setAiBusy(null);
+    }
+  }
+
+  function insertMarkdown(prefix: string, suffix: string = '') {
+    if (!form) return;
+    const textarea = document.getElementById('article-content-area') as HTMLTextAreaElement;
+    if (!textarea) {
+      setForm({ ...form, content: `${form.content}\n${prefix}${suffix}` });
+      return;
+    }
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = form.content;
+    const selection = text.substring(start, end) || 'texte';
+    const replacement = `${prefix}${selection}${suffix}`;
+    const newContent = text.substring(0, start) + replacement + text.substring(end);
+    setForm({ ...form, content: newContent });
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + prefix.length, start + prefix.length + selection.length);
+    }, 50);
+  }
+
+  function exportKnowledgeBase() {
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(articles, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', `luminae-knowledge-base-${new Date().toISOString().slice(0, 10)}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
   }
 
   async function reindex() {
@@ -231,53 +304,214 @@ export function ArticlesPanel() {
   // ── VUE 1 : Formulaire d'édition/création d'un article unique ──────────────
   if (form) {
     return (
-      <form onSubmit={save}>
-        <SectionHeader
-          title={form.id ? 'Modifier l’article' : 'Nouvel article'}
-          description="Le contenu alimente le bot : rédigez des réponses claires, précises et autonomes."
-        />
-        <Card>
-          <div className="space-y-4">
-            <Field label="Titre">
-              <input className={inputCls} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
-            </Field>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Catégorie">
-                <input
-                  className={inputCls}
-                  value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
-                  placeholder="Tarifs, Évaluations, Connexion…"
-                />
-              </Field>
-              <Field label="Tags" hint="Séparés par des virgules (ex: note, session, jury).">
-                <input
-                  className={inputCls}
-                  value={form.tags}
-                  onChange={(e) => setForm({ ...form, tags: e.target.value })}
-                  placeholder="tarifs, abonnement, faq"
-                />
-              </Field>
-            </div>
-            <Field label="Contenu">
-              <textarea
-                className={inputCls}
-                rows={10}
-                value={form.content}
-                onChange={(e) => setForm({ ...form, content: e.target.value })}
-                required
-              />
-            </Field>
-          </div>
-          <div className="mt-5 flex items-center gap-3">
-            <SaveButton busy={busy} label={form.id ? 'Mettre à jour' : 'Créer l’article'} />
+      <form onSubmit={save} className="space-y-4 animate-fade-in">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <SectionHeader
+            title={form.id ? 'Modifier l’article' : 'Nouvel article de connaissances'}
+            description="Le contenu alimente le bot Lumi et le Copilot conseiller : rédigez des réponses claires, précises et structurées."
+          />
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setForm(null)}
-              className="rounded-xl border border-mist-300 px-5 py-2.5 text-sm font-medium text-ink-600 transition hover:bg-mist"
+              className="rounded-xl border border-mist-300 bg-white px-3.5 py-2 text-xs font-semibold text-ink-600 transition hover:bg-mist"
             >
               Annuler
             </button>
+            <SaveButton busy={busy} label={form.id ? 'Mettre à jour' : 'Enregistrer & Indexer'} />
+          </div>
+        </div>
+
+        <FormNotice kind={notice?.kind ?? 'ok'} text={notice?.text ?? null} />
+
+        <Card className="p-5 space-y-4">
+          <Field label="Titre de l'article" required hint="Formulez un titre explicite (ex: Comment effectuer un retour sous 14 jours ?)">
+            <input
+              className={inputCls}
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+              placeholder="Ex: Procédure de remboursement et délais bancaires"
+              required
+            />
+          </Field>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Catégorie" hint="Ex: Livraison, Retours, Tarifs, Support…">
+              <input
+                className={inputCls}
+                value={form.category}
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                placeholder="Retours & Remboursements"
+              />
+            </Field>
+            <Field label="Mots-clés / Tags" hint="Séparés par des virgules pour faciliter la recherche.">
+              <input
+                className={inputCls}
+                value={form.tags}
+                onChange={(e) => setForm({ ...form, tags: e.target.value })}
+                placeholder="retour, colis, 14 jours, rib, virement"
+              />
+            </Field>
+          </div>
+
+          {/* ✨ Assistant IA Mistral pour la rédaction */}
+          <div className="rounded-2xl border border-aurora-300/80 bg-gradient-to-r from-aurora-100/50 via-white to-lagoon-50/40 p-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-aurora-300/60 text-xs">
+                  ✨
+                </span>
+                <span className="font-display text-xs font-bold text-ink">
+                  Assistant IA Mistral
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={!form.content.trim() || aiBusy !== null}
+                  onClick={() => runAiAssist('improve')}
+                  className="inline-flex items-center gap-1 rounded-xl bg-white border border-aurora-300 px-2.5 py-1 text-xs font-semibold text-lagoon-700 shadow-sm transition hover:bg-aurora-100 disabled:opacity-40"
+                >
+                  {aiBusy === 'improve' ? '✨ Structuration…' : '✨ Structurer & Polir'}
+                </button>
+                <button
+                  type="button"
+                  disabled={!form.content.trim() || aiBusy !== null}
+                  onClick={() => runAiAssist('faq')}
+                  className="inline-flex items-center gap-1 rounded-xl bg-white border border-aurora-300 px-2.5 py-1 text-xs font-semibold text-lagoon-700 shadow-sm transition hover:bg-aurora-100 disabled:opacity-40"
+                >
+                  {aiBusy === 'faq' ? '💡 Génération…' : '💡 Générer FAQ associée'}
+                </button>
+                <button
+                  type="button"
+                  disabled={!form.content.trim() || aiBusy !== null}
+                  onClick={() => runAiAssist('tags')}
+                  className="inline-flex items-center gap-1 rounded-xl bg-white border border-aurora-300 px-2.5 py-1 text-xs font-semibold text-lagoon-700 shadow-sm transition hover:bg-aurora-100 disabled:opacity-40"
+                >
+                  {aiBusy === 'tags' ? '🏷️ Analyse…' : '🏷️ Suggérer Catégorie & Tags'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Éditeur avec barre d'outils Markdown et onglets Mode Édition / Prévisualisation */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-semibold text-ink-700">Contenu de l&apos;article</span>
+              <div className="flex items-center rounded-xl border border-mist-300 bg-mist-50 p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setPreviewTab('edit')}
+                  className={cn(
+                    'rounded-lg px-3 py-1 font-medium transition',
+                    previewTab === 'edit' ? 'bg-white text-ink shadow-sm' : 'text-ink-500 hover:text-ink'
+                  )}
+                >
+                  ✏️ Rédiger
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewTab('preview')}
+                  className={cn(
+                    'rounded-lg px-3 py-1 font-medium transition',
+                    previewTab === 'preview' ? 'bg-white text-ink shadow-sm' : 'text-ink-500 hover:text-ink'
+                  )}
+                >
+                  👁️ Aperçu direct
+                </button>
+              </div>
+            </div>
+
+            {previewTab === 'edit' ? (
+              <div className="space-y-1.5">
+                {/* Barre d'outils Markdown */}
+                <div className="flex flex-wrap items-center gap-1 rounded-xl border border-mist-200 bg-mist-50/80 p-1.5 text-xs text-ink-600">
+                  <button
+                    type="button"
+                    onClick={() => insertMarkdown('## ')}
+                    className="rounded-lg px-2 py-1 font-bold hover:bg-white hover:shadow-sm"
+                    title="Titre H2"
+                  >
+                    H2
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => insertMarkdown('### ')}
+                    className="rounded-lg px-2 py-1 font-bold hover:bg-white hover:shadow-sm"
+                    title="Titre H3"
+                  >
+                    H3
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => insertMarkdown('**', '**')}
+                    className="rounded-lg px-2 py-1 font-bold hover:bg-white hover:shadow-sm"
+                    title="Gras"
+                  >
+                    B
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => insertMarkdown('*', '*')}
+                    className="rounded-lg px-2 py-1 italic hover:bg-white hover:shadow-sm"
+                    title="Italique"
+                  >
+                    I
+                  </button>
+                  <span className="h-4 w-px bg-mist-300 mx-1" />
+                  <button
+                    type="button"
+                    onClick={() => insertMarkdown('- ')}
+                    className="rounded-lg px-2 py-1 hover:bg-white hover:shadow-sm"
+                    title="Liste à puces"
+                  >
+                    • Liste
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => insertMarkdown('1. ')}
+                    className="rounded-lg px-2 py-1 hover:bg-white hover:shadow-sm"
+                    title="Liste numérotée"
+                  >
+                    1. Numéroté
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => insertMarkdown('> 💡 ')}
+                    className="rounded-lg px-2 py-1 hover:bg-white hover:shadow-sm"
+                    title="Encadré d'information"
+                  >
+                    💡 Info
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => insertMarkdown('> ⚠️ ')}
+                    className="rounded-lg px-2 py-1 hover:bg-white hover:shadow-sm"
+                    title="Avertissement"
+                  >
+                    ⚠️ Alerte
+                  </button>
+                </div>
+
+                <textarea
+                  id="article-content-area"
+                  className={cn(inputCls, 'font-mono text-xs leading-relaxed')}
+                  rows={14}
+                  value={form.content}
+                  onChange={(e) => setForm({ ...form, content: e.target.value })}
+                  placeholder="Rédigez ici le contenu de l'article en Markdown..."
+                  required
+                />
+              </div>
+            ) : (
+              <div className="min-h-[320px] rounded-2xl border border-mist-300 bg-white p-5 leading-relaxed text-xs text-ink shadow-inner space-y-2.5">
+                <h3 className="font-display text-base font-bold text-ink mb-3">{form.title || 'Titre de l’article'}</h3>
+                <div className="whitespace-pre-wrap font-sans text-xs text-ink-800 leading-relaxed">
+                  {form.content || 'Aucun contenu rédigé.'}
+                </div>
+              </div>
+            )}
           </div>
         </Card>
       </form>
@@ -287,7 +521,7 @@ export function ArticlesPanel() {
   // ── VUE 2 : Importer un fichier / document complet ────────────────────────
   if (importer) {
     return (
-      <div className="space-y-5">
+      <div className="space-y-5 animate-fade-in">
         <SectionHeader
           title="Importation & Conversion de Document"
           description="Déposez un document complet (.md, .json, .csv, .txt) pour le convertir et l'indexer automatiquement dans la base de connaissances."
@@ -333,107 +567,91 @@ export function ArticlesPanel() {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={busy}
-                className="mt-5 rounded-xl bg-lagoon-600 px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-lagoon-700 disabled:opacity-50"
+                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-lagoon-600 px-5 py-2.5 text-xs font-semibold text-white shadow-glow-sm transition hover:bg-lagoon-500 disabled:opacity-50"
               >
-                {busy ? 'Analyse du document…' : 'Parcourir les fichiers'}
+                Parcourir mes fichiers…
               </button>
             </div>
-
-            <div className="mt-6 flex justify-end">
+            <div className="mt-4">
               <button
                 type="button"
                 onClick={() => setImporter(null)}
-                className="rounded-xl border border-mist-300 px-4 py-2 text-xs font-medium text-ink-600 transition hover:bg-mist"
+                className="text-xs text-ink-500 hover:text-ink underline"
               >
-                Retour
+                Annuler et retourner aux articles
               </button>
             </div>
           </Card>
         )}
 
-        {(importer.stage === 'preview' || importer.stage === 'importing') && (
-          <div className="space-y-4">
-            {/* Barre de contrôle d'import */}
-            <Card className="p-5">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-md bg-lagoon-100 px-2 py-0.5 text-xs font-bold text-lagoon-700">
-                      {importer.articles.length} articles détectés
-                    </span>
-                    <span className="text-xs font-medium text-ink-500">Fichier : {importer.fileName}</span>
-                  </div>
-                  <p className="mt-1 text-xs text-ink-500">
-                    Vérifiez la segmentation ci-dessous avant d&apos;indexer les articles pour Lumi.
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3">
-                  {/* Mode d'importation */}
-                  <select
-                    value={importer.mode}
-                    onChange={(e) => setImporter({ ...importer, mode: e.target.value as 'append' | 'replace' })}
-                    disabled={importer.stage === 'importing'}
-                    className="rounded-xl border border-mist-300 bg-white px-3 py-2 text-xs font-medium text-ink shadow-sm"
-                  >
-                    <option value="append">Ajouter aux {articles.length} articles existants</option>
-                    <option value="replace">⚠️ Remplacer toute la base de connaissances</option>
-                  </select>
-
-                  <button
-                    type="button"
-                    onClick={executeImport}
-                    disabled={importer.stage === 'importing' || busy}
-                    className="rounded-xl bg-lagoon-600 px-5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-lagoon-700 disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {importer.stage === 'importing' ? (
-                      <>
-                        <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        <span>Indexation en cours (Mistral)…</span>
-                      </>
-                    ) : (
-                      <span>🚀 Confirmer et Indexer ({importer.articles.length})</span>
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setImporter(null)}
-                    disabled={importer.stage === 'importing'}
-                    className="rounded-xl border border-mist-300 px-3 py-2 text-xs font-medium text-ink-600 transition hover:bg-mist"
-                  >
-                    Annuler
-                  </button>
-                </div>
+        {importer.stage === 'preview' && (
+          <Card className="p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-mist-200 pb-3">
+              <div>
+                <p className="font-display text-sm font-bold text-ink">
+                  Aperçu : {importer.articles.length} article(s) détecté(s)
+                </p>
+                <p className="text-xs text-ink-500">Source : {importer.fileName}</p>
               </div>
-            </Card>
 
-            {/* Liste des articles détectés */}
-            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 text-xs text-ink-700 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="importMode"
+                    value="append"
+                    checked={importer.mode === 'append'}
+                    onChange={() => setImporter({ ...importer, mode: 'append' })}
+                    className="accent-lagoon-600"
+                  />
+                  <span>Ajouter aux existants</span>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-ink-700 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="importMode"
+                    value="replace"
+                    checked={importer.mode === 'replace'}
+                    onChange={() => setImporter({ ...importer, mode: 'replace' })}
+                    className="accent-lagoon-600"
+                  />
+                  <span className="text-coral-600 font-semibold">Remplacer toute la base</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
               {importer.articles.map((art, idx) => (
-                <div
-                  key={idx}
-                  className="rounded-2xl border border-mist-200 bg-white p-4 shadow-sm transition hover:border-lagoon-300"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-lagoon-50 text-[10px] font-bold text-lagoon-700">
-                        {idx + 1}
-                      </span>
-                      <h3 className="truncate font-display text-xs font-bold text-ink">{art.title}</h3>
-                      <span className="rounded bg-mist px-2 py-0.5 text-[10px] text-ink-500 shrink-0">
-                        {art.category}
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-ink-400 shrink-0">{art.content.length} caractères</span>
+                <div key={idx} className="rounded-xl border border-mist-200 bg-mist-50/50 p-3 text-xs">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-ink">{art.title}</span>
+                    <span className="rounded bg-white px-2 py-0.5 text-[10px] font-medium text-ink-500 border border-mist-200">
+                      {art.category || 'Général'}
+                    </span>
                   </div>
-                  <p className="mt-2 line-clamp-2 text-xs text-ink-600 leading-relaxed bg-mist-50/50 rounded-lg p-2">
-                    {art.content}
-                  </p>
+                  <p className="text-ink-600 line-clamp-2">{art.content}</p>
                 </div>
               ))}
             </div>
-          </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-mist-200">
+              <button
+                type="button"
+                onClick={() => setImporter(null)}
+                className="rounded-xl border border-mist-300 px-4 py-2 text-xs font-semibold text-ink-600 hover:bg-mist"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={executeImport}
+                disabled={busy}
+                className="rounded-xl bg-lagoon-600 px-5 py-2 text-xs font-semibold text-white shadow-glow-sm transition hover:bg-lagoon-500 disabled:opacity-50"
+              >
+                Importer {importer.articles.length} article(s) &rarr;
+              </button>
+            </div>
+          </Card>
         )}
       </div>
     );
@@ -444,7 +662,7 @@ export function ArticlesPanel() {
     <div className="animate-fade-in">
       <SectionHeader
         title="Base de connaissances"
-        description="Les articles sont convertis en vecteurs (Mistral Embeddings) pour la recherche sémantique du bot Lumi."
+        description="Les articles sont convertis en vecteurs (Mistral Embeddings) pour la recherche sémantique du bot Lumi et les suggestions Copilot."
       />
       <FormNotice kind={notice?.kind ?? 'ok'} text={notice?.text ?? null} />
 
@@ -457,6 +675,18 @@ export function ArticlesPanel() {
         </p>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Bouton d'exportation */}
+          {articles.length > 0 && (
+            <button
+              onClick={exportKnowledgeBase}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-mist-300 bg-white px-3 py-2 text-xs font-semibold text-ink shadow-sm transition hover:bg-mist hover:border-mist-400 active:scale-95"
+              title="Exporter tous les articles au format JSON"
+            >
+              <span>📤</span>
+              <span>Exporter</span>
+            </button>
+          )}
+
           {/* Bouton d'import de document complet */}
           <button
             onClick={() => {
@@ -488,6 +718,7 @@ export function ArticlesPanel() {
           <button
             onClick={() => {
               setForm(EMPTY);
+              setPreviewTab('edit');
               setNotice(null);
             }}
             className="rounded-xl bg-lagoon-600 px-4 py-2 text-xs font-semibold text-white shadow-glow-sm transition hover:bg-lagoon-500 active:scale-95"
