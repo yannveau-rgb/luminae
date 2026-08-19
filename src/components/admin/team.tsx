@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { Agent } from '@/lib/types';
-import { Card, FormNotice, SectionHeader, inputCls } from './parts';
+import { Card, FormNotice, SectionHeader, SkeletonList, inputCls } from './parts';
 import { cn } from '@/lib/utils';
 
 function generateSecurePassword() {
@@ -142,6 +142,8 @@ export function TeamPanel({ selfId }: { selfId: string }) {
       </div>
 
       <FormNotice kind={notice?.kind ?? 'ok'} text={notice?.text ?? null} />
+
+      {loading && <div className="mt-3"><SkeletonList count={3} /></div>}
 
       <div className="mt-3 space-y-3">
         {agents.map((a) => (

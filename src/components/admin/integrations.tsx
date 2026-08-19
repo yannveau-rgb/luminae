@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Card, Field, FormNotice, SaveButton, SectionHeader, inputCls } from './parts';
+import { Card, Field, FormNotice, SaveButton, SectionHeader, SkeletonCard, inputCls } from './parts';
 
 export interface TelephonySettings {
   enabled: boolean;
@@ -74,6 +74,7 @@ const DEFAULT_STRIPE: StripeIntegrationSettings = {
 };
 
 export function IntegrationsPanel() {
+  const [loading, setLoading] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState<'telephony' | 'ecommerce' | 'slack' | 'crm' | 'webhooks'>('telephony');
   const [telephony, setTelephony] = useState<TelephonySettings>(DEFAULT_TELEPHONY);
   const [slack, setSlack] = useState<SlackIntegrationSettings>(DEFAULT_SLACK);
@@ -92,7 +93,8 @@ export function IntegrationsPanel() {
         if (j.shopify) setShopify(j.shopify);
         if (j.stripe) setStripe(j.stripe);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   async function submitTelephony(e: React.FormEvent) {
@@ -151,10 +153,23 @@ export function IntegrationsPanel() {
     setBusy(false);
   }
 
+  if (loading) {
+    return (
+      <div className="space-y-5 animate-fade-in">
+        <SectionHeader
+          title="Intégrations & Connecteurs"
+          description="Connectez Luminae à vos canaux de vente (Shopify, Stripe, WooCommerce), vos outils de communication (Quicktalk, Slack) et vos automatisations métier (Zapier, Make, Webhooks)."
+        />
+        <SkeletonCard rows={3} />
+        <SkeletonCard rows={3} />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 animate-fade-in">
       <SectionHeader
-        title="Hub d'Intégrations & Connecteurs"
+        title="Intégrations & Connecteurs"
         description="Connectez Luminae à vos canaux de vente (Shopify, Stripe, WooCommerce), vos outils de communication (Quicktalk, Slack) et vos automatisations métier (Zapier, Make, Webhooks)."
       />
 

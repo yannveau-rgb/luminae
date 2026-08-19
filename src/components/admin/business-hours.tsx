@@ -3,7 +3,7 @@
 /** Horaires d'ouverture : fuseau, créneaux hebdomadaires, jours fériés. */
 
 import { useEffect, useState } from 'react';
-import { Card, Field, FormNotice, SaveButton, SectionHeader, inputCls } from './parts';
+import { Card, Field, FormNotice, SaveButton, SectionHeader, SkeletonCard, inputCls } from './parts';
 import { cn } from '@/lib/utils';
 
 type Weekly = Record<string, [string, string][]>;
@@ -32,6 +32,7 @@ const TIMEZONES = [
 ];
 
 export function BusinessHoursForm() {
+  const [loading, setLoading] = useState(true);
   const [timezone, setTimezone] = useState('Europe/Paris');
   const [weekly, setWeekly] = useState<Weekly>({});
   const [holidays, setHolidays] = useState<{ date: string; name: string }[]>([]);
@@ -48,7 +49,8 @@ export function BusinessHoursForm() {
         setWeekly((j.hours.weekly as Weekly) ?? {});
         setHolidays((j.hours.holidays as { date: string; name: string }[]) ?? []);
       })
-      .catch(() => setNotice({ kind: 'error', text: 'Impossible de charger les horaires.' }));
+      .catch(() => setNotice({ kind: 'error', text: 'Impossible de charger les horaires.' }))
+      .finally(() => setLoading(false));
   }, []);
 
   function setSlots(day: string, slots: [string, string][]) {
@@ -81,8 +83,21 @@ export function BusinessHoursForm() {
     setBusy(false);
   }
 
+  if (loading) {
+    return (
+      <div className="space-y-5 animate-fade-in">
+        <SectionHeader
+          title="Horaires d’ouverture"
+          description="Utilisés pour l’escalade : hors horaires, le bot informe les visiteurs du délai d’attente."
+        />
+        <SkeletonCard rows={2} />
+        <SkeletonCard rows={7} />
+      </div>
+    );
+  }
+
   return (
-    <form onSubmit={submit}>
+    <form onSubmit={submit} className="animate-fade-in">
       <SectionHeader
         title="Horaires d’ouverture"
         description="Utilisés pour l’escalade : hors horaires, le bot informe les visiteurs du délai d’attente."

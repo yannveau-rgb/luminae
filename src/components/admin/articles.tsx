@@ -3,7 +3,7 @@
 /** Base de connaissances : création, édition, indexation RAG et import de documents complets. */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Card, Field, FormNotice, SaveButton, SectionHeader, inputCls } from './parts';
+import { Card, EmptyState, Field, FormNotice, SaveButton, SectionHeader, SkeletonList, inputCls } from './parts';
 import { cn, timeAgo } from '@/lib/utils';
 import type { ParsedArticle } from '@/lib/knowledge-importer';
 
@@ -43,9 +43,24 @@ export function ArticlesPanel() {
   const [importer, setImporter] = useState<ImportState | null>(null);
   const [busy, setBusy] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCat, setSelectedCat] = useState<string>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const unindexedCount = articles.filter((a) => !a.indexed).length;
+  const categories = Array.from(new Set(articles.map((a) => a.category).filter(Boolean)));
+
+  const filteredArticles = articles.filter((a) => {
+    if (selectedCat === 'unindexed' && a.indexed) return false;
+    if (selectedCat !== 'all' && selectedCat !== 'unindexed' && a.category !== selectedCat) return false;
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      a.title.toLowerCase().includes(q) ||
+      (a.category ?? '').toLowerCase().includes(q) ||
+      (a.tags ?? []).some((t) => t.toLowerCase().includes(q))
+    );
+  });
 
   const load = useCallback(async () => {
     const res = await fetch('/api/admin/articles', { cache: 'no-store' });
@@ -426,7 +441,7 @@ export function ArticlesPanel() {
 
   // ── VUE 3 : Liste des articles existants ───────────────────────────────────
   return (
-    <div>
+    <div className="animate-fade-in">
       <SectionHeader
         title="Base de connaissances"
         description="Les articles sont convertis en vecteurs (Mistral Embeddings) pour la recherche sémantique du bot Lumi."
@@ -434,9 +449,9 @@ export function ArticlesPanel() {
       <FormNotice kind={notice?.kind ?? 'ok'} text={notice?.text ?? null} />
 
       <div className="mt-3 mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-ink-500">
+        <p className="text-xs font-medium text-ink-500">
           {loading
-            ? 'Chargement…'
+            ? 'Indexation en cours…'
             : `${articles.length} article${articles.length > 1 ? 's' : ''}` +
               (unindexedCount > 0 ? ` · ${unindexedCount} non indexé${unindexedCount > 1 ? 's' : ''}` : '')}
         </p>
@@ -454,7 +469,7 @@ export function ArticlesPanel() {
               });
               setNotice(null);
             }}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-mist-300 bg-white px-3.5 py-2 text-xs font-semibold text-ink shadow-sm transition hover:bg-mist hover:border-mist-400"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-mist-300 bg-white px-3.5 py-2 text-xs font-semibold text-ink shadow-sm transition hover:bg-mist hover:border-mist-400 active:scale-95"
           >
             <span>📥</span>
             <span>Déposer un document</span>
@@ -464,9 +479,9 @@ export function ArticlesPanel() {
             <button
               onClick={reindex}
               disabled={busy}
-              className="rounded-xl border border-lagoon-200 bg-white px-3.5 py-2 text-xs font-semibold text-lagoon-700 transition hover:bg-lagoon-50 disabled:opacity-50"
+              className="rounded-xl border border-lagoon-300 bg-lagoon-50 px-3.5 py-2 text-xs font-semibold text-lagoon-700 transition hover:bg-lagoon-100 disabled:opacity-50"
             >
-              Régénérer les index
+              ⚡ Régénérer les index ({unindexedCount})
             </button>
           )}
 
@@ -475,72 +490,188 @@ export function ArticlesPanel() {
               setForm(EMPTY);
               setNotice(null);
             }}
-            className="rounded-xl bg-lagoon-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-lagoon-700"
+            className="rounded-xl bg-lagoon-600 px-4 py-2 text-xs font-semibold text-white shadow-glow-sm transition hover:bg-lagoon-500 active:scale-95"
           >
             + Nouvel article
           </button>
         </div>
       </div>
 
-      {!loading && articles.length === 0 && (
-        <div className="rounded-2xl bg-white p-8 text-center shadow-panel">
-          <p className="text-sm font-semibold text-ink">Aucun article pour l’instant</p>
-          <p className="mt-1 text-xs text-ink-400">
-            Déposez votre document d&apos;entreprise ou créez vos articles manuellement pour alimenter l&apos;IA Lumi.
-          </p>
-          <button
-            onClick={() =>
-              setImporter({
-                stage: 'upload',
-                fileName: '',
-                rawContent: '',
-                mode: 'append',
-                articles: []
-              })
-            }
-            className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-lagoon-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-lagoon-700"
-          >
-            <span>📥 Déposer un document (.md, .json, .csv)</span>
-          </button>
+      {/* 🔍 Barre de Recherche en Direct & Filtres Catégories */}
+      {!loading && articles.length > 0 && (
+        <div className="mb-4 space-y-2.5">
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Rechercher par mot-clé, question, tag ou titre…"
+              className="w-full rounded-2xl border border-mist-300 bg-white py-2.5 pl-10 pr-4 text-xs text-ink placeholder:text-ink-400 outline-none transition focus:border-lagoon-400 focus:ring-2 focus:ring-lagoon-400/20 shadow-sm"
+            />
+            <span className="pointer-events-none absolute left-3.5 top-2.5 text-ink-400">
+              🔍
+            </span>
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3.5 top-2.5 text-xs text-ink-400 hover:text-ink"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Pilules de Catégories */}
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <button
+              type="button"
+              onClick={() => setSelectedCat('all')}
+              className={cn(
+                'rounded-xl px-3 py-1 font-medium transition',
+                selectedCat === 'all'
+                  ? 'bg-ink text-white shadow-sm'
+                  : 'bg-white text-ink-600 border border-mist-300 hover:bg-mist'
+              )}
+            >
+              Tous ({articles.length})
+            </button>
+
+            {unindexedCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedCat('unindexed')}
+                className={cn(
+                  'rounded-xl px-3 py-1 font-medium transition',
+                  selectedCat === 'unindexed'
+                    ? 'bg-coral-500 text-white shadow-sm'
+                    : 'bg-coral-50 text-coral-600 border border-coral-300 hover:bg-coral-100'
+                )}
+              >
+                Non indexés ({unindexedCount})
+              </button>
+            )}
+
+            {categories.map((cat) => {
+              const count = articles.filter((a) => a.category === cat).length;
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setSelectedCat(cat)}
+                  className={cn(
+                    'rounded-xl px-3 py-1 font-medium transition',
+                    selectedCat === cat
+                      ? 'bg-lagoon-600 text-white shadow-sm'
+                      : 'bg-white text-ink-600 border border-mist-300 hover:bg-mist'
+                  )}
+                >
+                  {cat} ({count})
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      <ul className="space-y-2">
-        {articles.map((a) => (
-          <li key={a.id} className="flex items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-panel">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="truncate text-sm font-semibold">{a.title}</p>
-                <span
-                  className={cn(
-                    'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase',
-                    a.indexed ? 'bg-lagoon-100 text-lagoon-700' : 'bg-coral-50 text-coral-600'
+      {loading && <SkeletonList count={4} />}
+
+      {!loading && articles.length === 0 && (
+        <EmptyState
+          icon="📚"
+          title="Aucun article pour l'instant"
+          description="Déposez vos documents d'entreprise (.md, .json, .csv) ou créez des articles manuellement pour que l'IA réponde précisément à vos clients."
+          action={
+            <button
+              onClick={() =>
+                setImporter({
+                  stage: 'upload',
+                  fileName: '',
+                  rawContent: '',
+                  mode: 'append',
+                  articles: []
+                })
+              }
+              className="inline-flex items-center gap-1.5 rounded-xl bg-lagoon-600 px-4 py-2.5 text-xs font-semibold text-white shadow-glow-sm transition hover:bg-lagoon-500"
+            >
+              <span>📥 Déposer un document (.md, .json, .csv)</span>
+            </button>
+          }
+        />
+      )}
+
+      {!loading && articles.length > 0 && filteredArticles.length === 0 && (
+        <EmptyState
+          icon="🔎"
+          title="Aucun article correspondant"
+          description={`Aucun résultat ne correspond à votre recherche « ${searchQuery} ».`}
+          action={
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setSelectedCat('all');
+              }}
+              className="rounded-xl border border-mist-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-ink-600 hover:bg-mist"
+            >
+              Réinitialiser les filtres
+            </button>
+          }
+        />
+      )}
+
+      {!loading && filteredArticles.length > 0 && (
+        <ul className="space-y-2.5">
+          {filteredArticles.map((a) => (
+            <li
+              key={a.id}
+              className="flex items-center gap-3 rounded-2xl border border-mist-300/80 bg-white p-4 shadow-panel transition hover:shadow-card-hover hover:border-mist-400"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="truncate text-sm font-bold text-ink">{a.title}</p>
+                  <span
+                    className={cn(
+                      'rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider',
+                      a.indexed ? 'bg-lagoon-100 text-lagoon-700' : 'bg-coral-50 text-coral-600 border border-coral-300'
+                    )}
+                  >
+                    {a.indexed ? 'Indexé' : 'Non indexé'}
+                  </span>
+                  {a.category && (
+                    <span className="rounded-full bg-mist-100 px-2 py-0.5 text-[11px] font-medium text-ink-600 border border-mist-200">
+                      {a.category}
+                    </span>
                   )}
-                >
-                  {a.indexed ? 'Indexé' : 'Non indexé'}
-                </span>
-                {a.category && (
-                  <span className="rounded-full bg-mist px-2 py-0.5 text-[11px] text-ink-500">{a.category}</span>
-                )}
+                  {a.tags && a.tags.length > 0 && (
+                    <span className="text-[11px] text-ink-400 font-mono">
+                      #{a.tags.slice(0, 3).join(' #')}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-ink-400">
+                  Modifié {timeAgo(a.updated_at)}
+                </p>
               </div>
-              <p className="mt-0.5 text-xs text-ink-400">Modifié {timeAgo(a.updated_at)}</p>
-            </div>
-            <button
-              onClick={() => startEdit(a.id)}
-              disabled={busy}
-              className="shrink-0 rounded-full px-3 py-1.5 text-xs font-medium text-lagoon-700 transition hover:bg-lagoon-50"
-            >
-              Modifier
-            </button>
-            <button
-              onClick={() => remove(a.id)}
-              className="shrink-0 rounded-full px-3 py-1.5 text-xs font-medium text-ink-500 transition hover:bg-coral-50 hover:text-coral-600"
-            >
-              Supprimer
-            </button>
-          </li>
-        ))}
-      </ul>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={() => startEdit(a.id)}
+                  disabled={busy}
+                  className="rounded-xl border border-mist-300 bg-white px-3 py-1.5 text-xs font-semibold text-lagoon-700 transition hover:bg-lagoon-50 hover:border-lagoon-300"
+                >
+                  Modifier
+                </button>
+                <button
+                  onClick={() => remove(a.id)}
+                  className="rounded-xl px-2.5 py-1.5 text-xs font-medium text-ink-400 transition hover:bg-coral-50 hover:text-coral-600"
+                  title="Supprimer l'article"
+                >
+                  ✕
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

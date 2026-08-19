@@ -377,6 +377,12 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
     }
   }
 
+  const csatMessage = messages.find(
+    (m) => typeof feedback[m.id] === 'string' && feedback[m.id]?.startsWith('csat:')
+  );
+  const convCsat = csatMessage ? feedback[csatMessage.id] : null;
+  const csatScore = convCsat && typeof convCsat === 'string' ? convCsat.split(':')[1] : null;
+
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden">
       {/* ── Section Centrale : Fil de discussion & Composeur ───────────────── */}
@@ -402,6 +408,15 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
                   {visitor?.display_name ?? 'Visiteur anonyme'}
                 </span>
                 <StatusBadge status={conv.status} />
+                {csatScore && (
+                  <span
+                    title={`Satisfaction client : ${csatScore}/5`}
+                    className="inline-flex items-center gap-1 rounded-full bg-sun-100 px-2.5 py-0.5 text-xs font-bold text-sun-700 border border-sun-300 shadow-sm animate-fade-in"
+                  >
+                    <span>⭐</span>
+                    <span>CSAT {csatScore}/5</span>
+                  </span>
+                )}
               </div>
 
               <div className="flex flex-wrap items-center gap-2 text-[11px] text-ink-400 mt-0.5">

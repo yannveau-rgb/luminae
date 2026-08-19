@@ -1,10 +1,45 @@
 'use client';
 
-/** Réglages du bot : identité, messages, comportement RAG. */
+/**
+ * Réglages du bot : identité, ambiance de marque, puces de tonalité rapides, RAG et messages.
+ */
 
 import { useEffect, useState } from 'react';
 import type { BotSettings } from '@/lib/types';
-import { Card, Field, FormNotice, SaveButton, SectionHeader, inputCls } from './parts';
+import { Card, Field, FormNotice, SaveButton, SectionHeader, SkeletonCard, inputCls } from './parts';
+import { BotOrb } from '@/components/widget/parts';
+import { cn } from '@/lib/utils';
+
+const TONE_PRESETS = [
+  {
+    emoji: '🤝',
+    label: 'Chaleureux & Empathique',
+    vibe: 'Chaleureux, bienveillant, dynamique et souriant',
+    tone: 'casual' as const,
+    length: 'normal' as const
+  },
+  {
+    emoji: '👔',
+    label: 'Professionnel & Précis',
+    vibe: 'Expert, courtois, rassurant et rigoureux',
+    tone: 'formal' as const,
+    length: 'normal' as const
+  },
+  {
+    emoji: '⚡',
+    label: 'Direct & Efficace',
+    vibe: 'Concis, rapide, axé sur les faits et les solutions',
+    tone: 'casual' as const,
+    length: 'concise' as const
+  },
+  {
+    emoji: '🛍️',
+    label: 'E-commerce & Vente',
+    vibe: 'Conseiller commercial enthousiaste, met en avant les produits et promotions',
+    tone: 'casual' as const,
+    length: 'normal' as const
+  }
+];
 
 export function BotSettingsForm() {
   const [s, setS] = useState<BotSettings | null>(null);
@@ -22,6 +57,11 @@ export function BotSettingsForm() {
     setS((prev) => (prev ? { ...prev, [key]: value } : prev));
   }
 
+  function applyPreset(preset: (typeof TONE_PRESETS)[number]) {
+    if (!s) return;
+    setS((prev) => (prev ? { ...prev, brand_vibe: preset.vibe, tone: preset.tone, reply_length: preset.length } : prev));
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!s) return;
@@ -35,7 +75,7 @@ export function BotSettingsForm() {
     const j = await res.json().catch(() => ({}));
     if (res.ok) {
       setS(j.settings);
-      setNotice({ kind: 'ok', text: 'Réglages enregistrés.' });
+      setNotice({ kind: 'ok', text: 'Réglages enregistrés avec succès.' });
     } else {
       setNotice({ kind: 'error', text: j.error ?? 'La sauvegarde a échoué.' });
     }
@@ -43,18 +83,36 @@ export function BotSettingsForm() {
   }
 
   if (!s) {
-    return <p className="text-sm text-ink-400">Chargement…</p>;
+    return (
+      <div className="space-y-5 animate-fade-in">
+        <SectionHeader
+          title="Bot & widget"
+          description="Identité, messages et comportement du bot. Les changements s’appliquent immédiatement au widget."
+        />
+        <SkeletonCard rows={3} />
+        <SkeletonCard rows={4} />
+        <SkeletonCard rows={3} />
+      </div>
+    );
   }
 
   return (
-    <form onSubmit={submit}>
+    <form onSubmit={submit} className="animate-fade-in">
       <SectionHeader
         title="Bot & widget"
         description="Identité, messages et comportement du bot. Les changements s’appliquent immédiatement au widget."
       />
       <div className="space-y-5">
+        {/* 🎨 Identité Visuelle du Bot */}
         <Card>
-          <h2 className="mb-4 text-sm font-semibold">Identité</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-bold text-ink">Identité Visuelle & Accueil</h2>
+            <div className="flex items-center gap-2 rounded-xl bg-mist-50 px-3 py-1.5 border border-mist-200">
+              <BotOrb size={22} accent={s.accent_color} glow />
+              <span className="text-xs font-semibold text-ink">{s.bot_name || 'Lumi'}</span>
+            </div>
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Nom du bot">
               <input className={inputCls} value={s.bot_name} onChange={(e) => set('bot_name', e.target.value)} />
@@ -65,7 +123,7 @@ export function BotSettingsForm() {
                   type="color"
                   value={s.accent_color}
                   onChange={(e) => set('accent_color', e.target.value)}
-                  className="h-10 w-12 shrink-0 cursor-pointer rounded-lg border border-mist-300 bg-white p-1"
+                  className="h-10 w-12 shrink-0 cursor-pointer rounded-xl border border-mist-300 bg-white p-1"
                 />
                 <input className={inputCls} value={s.accent_color} onChange={(e) => set('accent_color', e.target.value)} />
               </div>
@@ -83,7 +141,7 @@ export function BotSettingsForm() {
             <div className="sm:col-span-2">
               <Field
                 label="Politique de confidentialité"
-                hint="Adresse https. Affichée dans le pied du widget, à côté de « Supprimer mes données ». Laisser vide masque le lien."
+                hint="Adresse https. Affichée dans le pied du widget. Laisser vide pour masquer le lien."
               >
                 <input
                   className={inputCls}
@@ -104,7 +162,7 @@ export function BotSettingsForm() {
             <h2 className="text-sm font-bold text-ink">Identité de l&apos;Entreprise & Ambiance de Marque</h2>
           </div>
           <p className="text-xs text-ink-500 mb-4">
-            Renseignez les détails de votre entreprise (nom, activité, style, consignes) pour que le bot s&apos;imprègne de votre identité et adopte naturellement le ton de votre marque.
+            Renseignez les détails de votre entreprise pour que le bot s&apos;imprègne de votre identité et adopte naturellement le ton de votre marque.
           </p>
 
           <div className="space-y-4">
@@ -141,17 +199,42 @@ export function BotSettingsForm() {
               />
             </Field>
 
-            <Field
-              label="Ambiance & Style de communication souhaité"
-              hint="Ex: Chaleureux, enthousiaste et dynamique / Expert, sobre et rassurant / Convivial et souriant..."
-            >
-              <input
-                className={inputCls}
-                value={s.brand_vibe ?? ''}
-                onChange={(e) => set('brand_vibe', e.target.value)}
-                placeholder="Chaleureux, bienveillant, dynamique et souriant"
-              />
-            </Field>
+            {/* Puces de Tonalité Rapide */}
+            <div>
+              <span className="block text-xs font-semibold text-ink-700 mb-1.5">
+                Style & Tonalité recommandée (1-clic)
+              </span>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {TONE_PRESETS.map((p) => (
+                  <button
+                    key={p.label}
+                    type="button"
+                    onClick={() => applyPreset(p)}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition active:scale-95',
+                      s.brand_vibe === p.vibe
+                        ? 'border-lagoon-400 bg-lagoon-50 text-lagoon-700 shadow-sm'
+                        : 'border-mist-300 bg-white text-ink-600 hover:bg-mist'
+                    )}
+                  >
+                    <span>{p.emoji}</span>
+                    <span>{p.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              <Field
+                label="Ambiance personnalisée"
+                hint="Ex: Chaleureux, enthousiaste et dynamique / Expert, sobre et rassurant..."
+              >
+                <input
+                  className={inputCls}
+                  value={s.brand_vibe ?? ''}
+                  onChange={(e) => set('brand_vibe', e.target.value)}
+                  placeholder="Chaleureux, bienveillant, dynamique et souriant"
+                />
+              </Field>
+            </div>
 
             <Field
               label="Consignes & Règles d'or spécifiques pour le Bot"
@@ -169,7 +252,7 @@ export function BotSettingsForm() {
         </Card>
 
         <Card>
-          <h2 className="mb-4 text-sm font-semibold">Messages</h2>
+          <h2 className="mb-4 text-sm font-bold text-ink">Messages d&apos;accueil & de secours</h2>
           <div className="space-y-4">
             <Field label="Message de bienvenue">
               <textarea className={inputCls} rows={2} value={s.welcome_message} onChange={(e) => set('welcome_message', e.target.value)} />
@@ -184,12 +267,12 @@ export function BotSettingsForm() {
         </Card>
 
         <Card>
-          <h2 className="mb-4 text-sm font-semibold">Comportement</h2>
+          <h2 className="mb-4 text-sm font-bold text-ink">Précision de l&apos;IA & Comportement</h2>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Ton">
+            <Field label="Ton de langage">
               <select className={inputCls} value={s.tone} onChange={(e) => set('tone', e.target.value as BotSettings['tone'])}>
-                <option value="formal">Professionnel</option>
-                <option value="casual">Décontracté</option>
+                <option value="formal">Professionnel (Vouvoiement)</option>
+                <option value="casual">Chaleureux / Décontracté</option>
               </select>
             </Field>
             <Field label="Longueur des réponses">
@@ -198,9 +281,9 @@ export function BotSettingsForm() {
                 value={s.reply_length}
                 onChange={(e) => set('reply_length', e.target.value as BotSettings['reply_length'])}
               >
-                <option value="concise">Concise</option>
-                <option value="normal">Normale</option>
-                <option value="detailed">Détaillée</option>
+                <option value="concise">Concise & Directe</option>
+                <option value="normal">Normale & Équilibrée</option>
+                <option value="detailed">Détaillée & Complète</option>
               </select>
             </Field>
             <Field label="Seuil de précision IA" hint="Précision minimale requise pour répondre automatiquement (0 à 1).">
@@ -214,7 +297,7 @@ export function BotSettingsForm() {
                 onChange={(e) => set('rag_threshold', Number(e.target.value))}
               />
             </Field>
-            <Field label="Nombre d'articles consultés" hint="Entre 1 et 10 articles de référence par question.">
+            <Field label="Articles de référence consultés" hint="Entre 1 et 10 articles de référence par question.">
               <input
                 type="number"
                 className={inputCls}
@@ -224,14 +307,14 @@ export function BotSettingsForm() {
                 onChange={(e) => set('rag_top_k', Number(e.target.value))}
               />
             </Field>
-            <label className="flex items-center gap-2.5 text-sm text-ink-700 sm:col-span-2">
+            <label className="flex items-center gap-2.5 text-sm text-ink sm:col-span-2 cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={s.small_talk_enabled}
                 onChange={(e) => set('small_talk_enabled', e.target.checked)}
-                className="h-4 w-4 accent-lagoon-600"
+                className="h-4 w-4 accent-lagoon-600 rounded"
               />
-              Autoriser la conversation légère (small talk)
+              <span className="text-xs font-semibold text-ink-700">Autoriser les formules de politesse et conversation légère (Small talk)</span>
             </label>
           </div>
         </Card>
