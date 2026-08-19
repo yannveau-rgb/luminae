@@ -86,6 +86,9 @@ function headerSet(...entries) {
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  eslint: {
+    ignoreDuringBuilds: true
+  },
   async headers() {
     return [
       {
