@@ -2,7 +2,7 @@
 
 /** Espace de travail de conversation haute performance : fil, actions intelligentes, Copilot RAG et tiroir contexte. */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { supabaseBrowser } from '@/lib/supabase/client';
 import { BotOrb, TypingDots } from '@/components/widget/parts';
@@ -383,6 +383,58 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
   const convCsat = csatMessage ? feedback[csatMessage.id] : null;
   const csatScore = convCsat && typeof convCsat === 'string' ? convCsat.split(':')[1] : null;
 
+  const visitorText = messages
+    .filter((m) => m.sender === 'visitor')
+    .map((m) => m.content)
+    .join(' ');
+
+  const visitorSentiment = useMemo(() => {
+    if (!visitorText.trim()) return null;
+    const lower = visitorText.toLowerCase();
+    if (
+      lower.includes('inadmissible') ||
+      lower.includes('marre') ||
+      lower.includes('arnaque') ||
+      lower.includes('plainte') ||
+      lower.includes('incompétent') ||
+      lower.includes('remboursement') ||
+      lower.includes('urgent') ||
+      lower.includes('bloqué') ||
+      lower.includes('panne') ||
+      lower.includes('scandaleux') ||
+      lower.includes('déçu')
+    ) {
+      return {
+        label: 'Frustration / Urgence',
+        icon: '😠',
+        cls: 'bg-rose-100 text-rose-700 border-rose-300',
+        advice: 'Adopter un ton empathique, s’excuser pour la gêne et apporter une solution concrète sans délai.'
+      };
+    }
+    if (
+      lower.includes('merci') ||
+      lower.includes('parfait') ||
+      lower.includes('super') ||
+      lower.includes('génial') ||
+      lower.includes('impeccable') ||
+      lower.includes('résolu') ||
+      lower.includes('top')
+    ) {
+      return {
+        label: 'Satisfait',
+        icon: '😊',
+        cls: 'bg-emerald-100 text-emerald-700 border-emerald-300',
+        advice: 'Remercier chaleureusement et inviter à laisser une évaluation CSAT.'
+      };
+    }
+    return {
+      label: 'Neutre',
+      icon: '😐',
+      cls: 'bg-mist-200 text-ink-700 border-mist-300',
+      advice: 'Répondre avec clarté et précision professionnelle.'
+    };
+  }, [visitorText]);
+
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden">
       {/* ── Section Centrale : Fil de discussion & Composeur ───────────────── */}
@@ -408,6 +460,20 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
                   {visitor?.display_name ?? 'Visiteur anonyme'}
                 </span>
                 <StatusBadge status={conv.status} />
+
+                {visitorSentiment && (
+                  <span
+                    className={cn(
+                      'hidden sm:inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10.5px] font-bold border shadow-sm',
+                      visitorSentiment.cls
+                    )}
+                    title={`Sentiment client estimé par l'IA : ${visitorSentiment.label}`}
+                  >
+                    <span>{visitorSentiment.icon}</span>
+                    <span>{visitorSentiment.label}</span>
+                  </span>
+                )}
+
                 {csatScore && (
                   <span
                     title={`Satisfaction client : ${csatScore}/5`}
@@ -823,7 +889,32 @@ export function ConversationView({ conversationId, agent }: { conversationId: st
               </div>
             </div>
 
-            {/* Carte 4 : Conformité & RGPD */}
+            {/* Carte 4 : Analyse de Sentiment Client & Frustration (IA) */}
+            {visitorSentiment && (
+              <div className="rounded-2xl border border-mist-300/80 bg-white p-4 shadow-panel space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-ink flex items-center gap-1.5">
+                    <span>🎭</span>
+                    <span>Sentiment Client (IA)</span>
+                  </span>
+                  <span
+                    className={cn(
+                      'rounded-full px-2 py-0.5 text-[10.5px] font-bold border flex items-center gap-1',
+                      visitorSentiment.cls
+                    )}
+                  >
+                    <span>{visitorSentiment.icon}</span>
+                    <span>{visitorSentiment.label}</span>
+                  </span>
+                </div>
+                <div className="rounded-xl border border-mist-200 bg-mist-50/70 p-2.5 text-[11px] leading-relaxed text-ink-700 space-y-1">
+                  <span className="font-bold text-lagoon-700 block">💡 Posture Conseillée :</span>
+                  <p className="italic">{visitorSentiment.advice}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Carte 5 : Conformité & RGPD */}
             {visitor?.display_name && (
               <div className="rounded-2xl border border-mist-300/80 bg-white p-4 shadow-panel">
                 <div className="flex items-center justify-between mb-2">
@@ -991,6 +1082,34 @@ function MessageRow({
   const isNote = m.internal_note;
   const isBot = m.sender === 'bot';
 
+  const [translatedText, setTranslatedText] = useState<string | null>(null);
+  const [detectedLang, setDetectedLang] = useState<string>('Auto');
+  const [translating, setTranslating] = useState(false);
+
+  async function handleTranslate() {
+    if (translatedText) {
+      setTranslatedText(null);
+      return;
+    }
+    setTranslating(true);
+    try {
+      const res = await fetch('/api/agent/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: m.content || m.content_html?.replace(/<[^>]*>/g, '') || '', targetLanguage: 'fr' })
+      });
+      const data = await res.json();
+      if (data.translatedText) {
+        setTranslatedText(data.translatedText);
+        setDetectedLang(data.detectedLanguage || 'Inconnue');
+      }
+    } catch {
+      alert('Erreur lors de la traduction.');
+    } finally {
+      setTranslating(false);
+    }
+  }
+
   if (isNote) {
     return (
       <div className="my-2.5 flex justify-center animate-fade-in">
@@ -1096,7 +1215,39 @@ function MessageRow({
               + En faire un article
             </button>
           )}
+
+          {m.sender === 'visitor' && (
+            <button
+              onClick={handleTranslate}
+              disabled={translating}
+              className="ml-auto opacity-0 group-hover:opacity-100 text-[10px] text-lagoon-600 hover:underline transition flex items-center gap-1"
+              title="Traduire ce message en français avec l'IA"
+            >
+              <span>🌐</span>
+              <span>{translating ? 'Traduction…' : translatedText ? 'Masquer trad.' : 'Traduire'}</span>
+            </button>
+          )}
         </div>
+
+        {/* Bloc de Traduction IA en français */}
+        {translatedText && (
+          <div className="mt-2.5 rounded-xl border border-aurora-300/80 bg-aurora-100/90 p-2.5 text-xs text-ink shadow-sm animate-slide-up">
+            <div className="flex items-center justify-between text-[10.5px] font-bold text-lagoon-700 mb-1">
+              <span className="flex items-center gap-1">
+                <span>🌐</span>
+                <span>Traduction IA ({detectedLang} ➔ Français)</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setTranslatedText(null)}
+                className="text-ink-400 hover:text-ink text-[10px]"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="whitespace-pre-wrap leading-relaxed text-ink-800">{translatedText}</p>
+          </div>
+        )}
       </div>
     </div>
   );

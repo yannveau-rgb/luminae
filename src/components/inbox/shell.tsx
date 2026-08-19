@@ -921,6 +921,51 @@ export function InboxShell({
                             <div className="mt-2 flex items-center gap-1.5">
                               <StatusBadge status={it.status} />
 
+                              {(() => {
+                                const msg = (it.last_message?.content || '').toLowerCase();
+                                if (
+                                  msg.includes('inadmissible') ||
+                                  msg.includes('marre') ||
+                                  msg.includes('arnaque') ||
+                                  msg.includes('plainte') ||
+                                  msg.includes('incompétent') ||
+                                  msg.includes('remboursement') ||
+                                  msg.includes('urgent') ||
+                                  msg.includes('bloqué') ||
+                                  msg.includes('panne') ||
+                                  msg.includes('scandaleux') ||
+                                  msg.includes('déçu')
+                                ) {
+                                  return (
+                                    <span
+                                      className="rounded-md bg-rose-100 px-1.5 py-0.5 text-[9.5px] font-bold text-rose-700 border border-rose-300 animate-pulse"
+                                      title="Sentiment : Frustration / Urgence détectée"
+                                    >
+                                      😠 Urgent
+                                    </span>
+                                  );
+                                }
+                                if (
+                                  msg.includes('merci') ||
+                                  msg.includes('parfait') ||
+                                  msg.includes('super') ||
+                                  msg.includes('génial') ||
+                                  msg.includes('impeccable') ||
+                                  msg.includes('résolu') ||
+                                  msg.includes('top')
+                                ) {
+                                  return (
+                                    <span
+                                      className="rounded-md bg-emerald-100 px-1.5 py-0.5 text-[9.5px] font-bold text-emerald-700 border border-emerald-300"
+                                      title="Sentiment : Client très satisfait"
+                                    >
+                                      😊 Satisfait
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
+
                               {it.assigned_name && (
                                 <span className="truncate rounded-md bg-mist-200/80 px-1.5 py-0.5 text-[10px] font-medium text-ink-600">
                                   👤 {it.assigned_name}

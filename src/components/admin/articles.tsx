@@ -52,6 +52,10 @@ export function ArticlesPanel() {
   const [selectedCat, setSelectedCat] = useState<string>('all');
   const [previewTab, setPreviewTab] = useState<'edit' | 'preview'>('edit');
   const [aiBusy, setAiBusy] = useState<'improve' | 'faq' | 'tags' | null>(null);
+  const [urlModalOpen, setUrlModalOpen] = useState(false);
+  const [urlInput, setUrlInput] = useState('');
+  const [urlBusy, setUrlBusy] = useState(false);
+  const [urlResults, setUrlResults] = useState<Array<{ title: string; category: string; tags: string[]; content: string }> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const unindexedCount = articles.filter((a) => !a.indexed).length;
@@ -291,6 +295,63 @@ export function ArticlesPanel() {
       setImporter({ ...importer, stage: 'preview' });
     }
     setBusy(false);
+  }
+
+  async function handleUrlCrawl(e: React.FormEvent) {
+    e.preventDefault();
+    if (!urlInput.trim() || urlBusy) return;
+    setUrlBusy(true);
+    setUrlResults(null);
+    try {
+      const res = await fetch('/api/admin/articles/ai-crawl', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: urlInput.trim(), autoSave: false })
+      });
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.articles)) {
+        setUrlResults(data.articles);
+      } else {
+        alert(data.error || 'Erreur lors de l’analyse de la page.');
+      }
+    } catch {
+      alert('Erreur réseau lors de l’appel de l’IA.');
+    } finally {
+      setUrlBusy(false);
+    }
+  }
+
+  async function saveCrawledArticles() {
+    if (!urlResults || urlResults.length === 0) return;
+    setUrlBusy(true);
+    try {
+      const res = await fetch('/api/admin/articles/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'import',
+          mode: 'append',
+          articles: urlResults
+        })
+      });
+      const j = await res.json();
+      if (res.ok) {
+        setNotice({
+          kind: 'ok',
+          text: `🎉 ${j.count} articles importés et indexés depuis le web !`
+        });
+        setUrlModalOpen(false);
+        setUrlResults(null);
+        setUrlInput('');
+        load();
+      } else {
+        alert(j.error || 'Erreur lors de l’importation.');
+      }
+    } catch {
+      alert('Erreur réseau.');
+    } finally {
+      setUrlBusy(false);
+    }
   }
 
   function handleDrop(e: React.DragEvent) {
@@ -687,6 +748,19 @@ export function ArticlesPanel() {
             </button>
           )}
 
+          {/* Bouton d'importation IA depuis un site web ou une FAQ */}
+          <button
+            type="button"
+            onClick={() => {
+              setUrlModalOpen(true);
+              setUrlResults(null);
+            }}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-aurora-300 bg-aurora-100/80 px-3.5 py-2 text-xs font-semibold text-lagoon-700 shadow-sm transition hover:bg-aurora-100 hover:border-aurora-400 active:scale-95"
+          >
+            <span>🌐</span>
+            <span>Importer par URL</span>
+          </button>
+
           {/* Bouton d'import de document complet */}
           <button
             onClick={() => {
@@ -902,6 +976,111 @@ export function ArticlesPanel() {
             </li>
           ))}
         </ul>
+      )}
+
+      {/* ── MODALE D'IMPORTATION IA DEPUIS UNE URL ─────────────────────────── */}
+      {urlModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="w-full max-w-2xl rounded-3xl border border-mist-300 bg-white p-6 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-mist-200 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-aurora-100 text-base">
+                  🌐
+                </div>
+                <div>
+                  <h3 className="font-display text-sm font-bold text-ink">
+                    Importer depuis un Site Web ou une FAQ existante
+                  </h3>
+                  <p className="text-xs text-ink-500">
+                    L'IA Mistral scrape l'URL, extrait et découpe le contenu en articles prêts à l'emploi.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUrlModalOpen(false)}
+                className="rounded-lg p-1 text-ink-400 hover:text-ink hover:bg-mist"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleUrlCrawl} className="space-y-3">
+              <label className="block">
+                <span className="mb-1 block text-xs font-bold text-ink">
+                  URL de la page web ou de la FAQ
+                </span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="url"
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    placeholder="https://monsite.com/faq ou https://monsite.com/aide"
+                    required
+                    disabled={urlBusy}
+                    className="flex-1 rounded-xl border border-mist-300 px-3.5 py-2.5 text-xs text-ink outline-none focus:border-lagoon-400 shadow-sm"
+                  />
+                  <button
+                    type="submit"
+                    disabled={urlBusy || !urlInput.trim()}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-lagoon-600 px-4 py-2.5 text-xs font-bold text-white shadow-glow-sm transition hover:bg-lagoon-500 disabled:opacity-50 shrink-0"
+                  >
+                    {urlBusy ? (
+                      <>
+                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        <span>Analyse IA…</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>✨</span>
+                        <span>Analyser & Extraire</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </label>
+            </form>
+
+            {/* Aperçu des articles extraits */}
+            {urlResults && (
+              <div className="space-y-3 pt-2 border-t border-mist-200 animate-slide-up">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-ink flex items-center gap-1.5">
+                    <span>🎉</span>
+                    <span>{urlResults.length} article(s) détecté(s) & structuré(s)</span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={saveCrawledArticles}
+                    disabled={urlBusy}
+                    className="rounded-xl bg-gradient-to-r from-emerald-600 to-lagoon-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:opacity-95 transition disabled:opacity-50"
+                  >
+                    📥 Tout importer dans la base ({urlResults.length})
+                  </button>
+                </div>
+
+                <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+                  {urlResults.map((art, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded-xl border border-mist-200 bg-mist-50/60 p-3 text-xs space-y-1"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-ink">{art.title}</span>
+                        <span className="rounded bg-white px-2 py-0.5 text-[10.5px] font-medium text-lagoon-700 border border-mist-200">
+                          {art.category}
+                        </span>
+                      </div>
+                      <p className="text-ink-600 line-clamp-2 text-[11px] leading-relaxed">
+                        {art.content}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

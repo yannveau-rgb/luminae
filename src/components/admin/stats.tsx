@@ -167,6 +167,23 @@ export function StatsPanel() {
   const [days, setDays] = useState<(typeof RANGES)[number]['days']>(30);
   const [stats, setStats] = useState<StatsPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [briefing, setBriefing] = useState<any>(null);
+  const [briefingBusy, setBriefingBusy] = useState(false);
+
+  const loadBriefing = useCallback(async () => {
+    setBriefingBusy(true);
+    try {
+      const res = await fetch('/api/admin/stats/ai-briefing', { cache: 'no-store' });
+      if (res.ok) {
+        const j = await res.json();
+        setBriefing(j.briefing);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setBriefingBusy(false);
+    }
+  }, []);
 
   const load = useCallback(async (d: number) => {
     setLoading(true);
@@ -180,7 +197,8 @@ export function StatsPanel() {
 
   useEffect(() => {
     load(days);
-  }, [days, load]);
+    loadBriefing();
+  }, [days, load, loadBriefing]);
 
   function triggerExport(format: 'csv' | 'json') {
     const url = `/api/admin/stats/export?days=${days}&format=${format}`;
@@ -255,6 +273,87 @@ export function StatsPanel() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* ── SECTION EXÉCUTIVE : Synthèse Hebdomadaire IA pour la Direction ── */}
+      <div className="rounded-3xl border border-aurora-300/80 bg-gradient-to-br from-aurora-100/70 via-white to-lagoon-50/50 p-5 text-ink shadow-sm space-y-3.5 animate-fade-in">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-aurora-300/80 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 to-lagoon-600 text-white text-sm shadow-sm">
+              ✨
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-display text-sm font-bold text-ink">
+                  Synthèse Stratégique & Briefing Exécutif (IA Mistral)
+                </h3>
+                <span className="rounded-full bg-lagoon-100 px-2 py-0.5 text-[10px] font-bold text-lagoon-700 border border-lagoon-200">
+                  {briefing?.period || 'Semaine en cours'}
+                </span>
+              </div>
+              <p className="text-xs text-ink-500">
+                {briefing?.headline || 'Audit automatique des performances du service client.'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={loadBriefing}
+            disabled={briefingBusy}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-mist-300 bg-white px-3 py-1.5 text-xs font-semibold text-ink shadow-sm hover:bg-mist transition disabled:opacity-50"
+          >
+            <span>{briefingBusy ? '⏳' : '🔄'}</span>
+            <span>{briefingBusy ? 'Analyse…' : 'Régénérer la synthèse'}</span>
+          </button>
+        </div>
+
+        {briefing ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 pt-1 text-xs">
+            {/* Faits Marquants */}
+            <div className="rounded-2xl border border-mist-200 bg-white/90 p-3.5 space-y-2 shadow-sm">
+              <span className="font-bold text-lagoon-700 flex items-center gap-1.5 text-[11.5px]">
+                <span>🏆</span>
+                <span>Faits Marquants</span>
+              </span>
+              <ul className="space-y-1.5 text-[11px] text-ink-700 list-disc list-inside leading-relaxed">
+                {(briefing.highlights || []).map((h: string, idx: number) => (
+                  <li key={idx} className="line-clamp-2">{h}</li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Motifs Majeurs */}
+            <div className="rounded-2xl border border-mist-200 bg-white/90 p-3.5 space-y-2 shadow-sm">
+              <span className="font-bold text-sun-700 flex items-center gap-1.5 text-[11.5px]">
+                <span>🔍</span>
+                <span>Motifs de Contact Principaux</span>
+              </span>
+              <ul className="space-y-1.5 text-[11px] text-ink-700 list-disc list-inside leading-relaxed">
+                {(briefing.topMotives || []).map((m: string, idx: number) => (
+                  <li key={idx} className="line-clamp-2">{m}</li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Actions Recommandées */}
+            <div className="rounded-2xl border border-emerald-300 bg-emerald-50/50 p-3.5 space-y-2 shadow-sm sm:col-span-2 lg:col-span-1">
+              <span className="font-bold text-emerald-800 flex items-center gap-1.5 text-[11.5px]">
+                <span>🚀</span>
+                <span>3 Actions Recommandées</span>
+              </span>
+              <ul className="space-y-1.5 text-[11px] text-emerald-950 list-disc list-inside leading-relaxed font-medium">
+                {(briefing.recommendedActions || []).map((a: string, idx: number) => (
+                  <li key={idx} className="line-clamp-2">{a}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-ink-400 italic py-2">
+            Chargement de la synthèse managériale en cours…
+          </p>
+        )}
       </div>
 
       {/* Cartes KPI Principales */}
