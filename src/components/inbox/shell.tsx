@@ -320,6 +320,8 @@ export function InboxShell({
     if (view === 'inbox') {
       if (selectedId) router.push(`/inbox/${selectedId}`);
       else router.push('/inbox');
+    } else {
+      router.push(`/admin?tab=${view}`);
     }
   }
 

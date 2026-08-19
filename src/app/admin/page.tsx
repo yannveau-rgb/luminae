@@ -6,8 +6,11 @@ import { AccessDenied } from '@/components/access-denied';
 
 export const dynamic = 'force-dynamic';
 
-/** Back-office — Hub unifié réservé aux administrateurs. */
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams
+}: {
+  searchParams?: { tab?: string; view?: string };
+}) {
   let agent;
   try {
     agent = await requireAgent('admin');
@@ -19,9 +22,12 @@ export default async function AdminPage() {
     }
     throw err;
   }
+
+  const initialTab = searchParams?.tab || searchParams?.view || 'stats';
+
   return (
     <Suspense fallback={<div className="flex h-screen items-center justify-center bg-mist text-sm text-ink-400">Chargement…</div>}>
-      <InboxShell agent={agent} selectedId={null} initialView="stats" />
+      <InboxShell agent={agent} selectedId={null} initialView={initialTab} />
     </Suspense>
   );
 }
