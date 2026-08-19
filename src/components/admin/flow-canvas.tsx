@@ -2,13 +2,14 @@
 
 /**
  * Studio de Workflows Visuel No-Code Luminae (Flow Canvas).
- * Canvas interactif par nœuds et câbles courbes SVG avec les 6 super-pouvoirs :
- * 1. Mode Brouillon vs Publier en direct
- * 2. Auto-Layout (« ✨ Aligner l'arbre »)
- * 3. Simulateur de Persona (Heures ouvrées vs Hors horaires / Mobile vs PC)
- * 4. Duplication / Cloner 1-clic de bloc
- * 5. Historique Annuler / Rétablir (Ctrl+Z / Ctrl+Y)
- * 6. Exportation & Importation JSON
+ * Canvas interactif par nœuds et câbles courbes SVG avec :
+ * 1. Architecte IA Conversationnel (Prompt-to-Flow avec clarification)
+ * 2. Mode Brouillon vs Publier en direct
+ * 3. Auto-Layout (« ✨ Aligner l'arbre »)
+ * 4. Simulateur de Persona (Heures ouvrées vs Hors horaires / Mobile vs PC)
+ * 5. Duplication / Cloner 1-clic de bloc
+ * 6. Historique Annuler / Rétablir (Ctrl+Z / Ctrl+Y)
+ * 7. Exportation & Importation JSON
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -31,7 +32,7 @@ interface FlowCanvasProps {
 export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasProps) {
   const [workflow, setWorkflowState] = useState<VisualWorkflow>(initialWf);
 
-  // ── HISTORIQUE UNDO / REDO (SUPER-POUVOIR 5) ──────────────────────────────
+  // ── HISTORIQUE UNDO / REDO ────────────────────────────────────────────────
   const [history, setHistory] = useState<VisualWorkflow[]>([initialWf]);
   const [historyIdx, setHistoryIdx] = useState(0);
 
@@ -99,7 +100,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const selectedNode = workflow.nodes.find((n) => n.id === selectedNodeId) ?? null;
 
-  // ── SURVEILLANCE DU TEST ET SIMULATEUR DE CONDITIONS (SUPER-POUVOIR 3) ────
+  // ── SURVEILLANCE DU TEST ET SIMULATEUR DE CONDITIONS ──────────────────────
   const [simulatorOpen, setSimulatorOpen] = useState(false);
   const [simHistory, setSimHistory] = useState<
     Array<{ sender: 'bot' | 'visitor'; text: string; options?: ChoiceOption[]; isError?: boolean }>
@@ -112,12 +113,24 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
 
   // Variables de simulation de Persona
   const [simHoursMode, setSimHoursMode] = useState<'open' | 'closed'>('open');
-  const [simDevice, setSimDevice] = useState<'desktop' | 'mobile'>('desktop');
 
   // Palette & Diagnostics
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
+
+  // ── ARCHITECTE IA CONVERSATIONNEL (PROMPT-TO-WORKFLOW) ────────────────────
+  const [aiArchitectOpen, setAiArchitectOpen] = useState(false);
+  const [aiMessages, setAiMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
+    {
+      role: 'assistant',
+      content:
+        'Bonjour ! Je suis votre Architecte IA. Décrivez-moi le scénario que vous souhaitez créer (ex: qualification de leads devis, gestion des retours 14j, dépannage technique, accueil nuit...) et je vais le dessiner pour vous. Si besoin, je vous poserai des questions pour affiner les choix !'
+    }
+  ]);
+  const [aiInput, setAiInput] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiGeneratedWf, setAiGeneratedWf] = useState<VisualWorkflow | null>(null);
 
   const canvasRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -198,7 +211,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
     setSelectedNodeId(nodeId);
   }
 
-  // ── AUTO-LAYOUT : RANGER ET ALIGNER L'ARBRE (SUPER-POUVOIR 2) ─────────────
+  // ── AUTO-LAYOUT : RANGER ET ALIGNER L'ARBRE ──────────────────────────────
   function autoLayoutTree() {
     const root = workflow.nodes.find((n) => n.type === 'trigger') || workflow.nodes[0];
     if (!root) return;
@@ -214,9 +227,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
       const currNode = workflow.nodes.find((n) => n.id === currId);
       const childIds: string[] = [];
 
-      // Enfants via edges
       workflow.edges.filter((e) => e.source === currId).forEach((e) => childIds.push(e.target));
-      // Enfants via options de boutons
       currNode?.data.options?.forEach((opt) => {
         if (opt.targetNodeId) childIds.push(opt.targetNodeId);
       });
@@ -229,7 +240,6 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
       }
     }
 
-    // Regrouper par niveau
     const levelGroups: Map<number, FlowNode[]> = new Map();
     for (const node of workflow.nodes) {
       const lvl = levels.get(node.id) ?? 0;
@@ -261,7 +271,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
     setPan({ x: 100, y: 50 });
   }
 
-  // ── DUPLIQUER / CLONER UN BLOC (SUPER-POUVOIR 4) ──────────────────────────
+  // ── DUPLIQUER / CLONER UN BLOC ───────────────────────────────────────────
   function duplicateNode(nodeId: string) {
     const src = workflow.nodes.find((n) => n.id === nodeId);
     if (!src) return;
@@ -291,7 +301,61 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
     setSelectedNodeId(newId);
   }
 
-  // ── EXPORTATION & IMPORTATION JSON (SUPER-POUVOIR 6) ───────────────────────
+  // ── ENVOI À L'ARCHITECTE IA (PROMPT-TO-FLOW) ──────────────────────────────
+  async function handleSendAiPrompt(overrideText?: string) {
+    const textToSend = (overrideText || aiInput).trim();
+    if (!textToSend || aiLoading) return;
+
+    const nextMessages = [...aiMessages, { role: 'user' as const, content: textToSend }];
+    setAiMessages(nextMessages);
+    setAiInput('');
+    setAiLoading(true);
+    setAiGeneratedWf(null);
+
+    try {
+      const res = await fetch('/api/admin/workflows/ai-architect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: nextMessages })
+      });
+
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+
+      setAiMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: data.message || 'Voici ma réponse.' }
+      ]);
+
+      if (data.status === 'ready' && data.workflow) {
+        setAiGeneratedWf(data.workflow);
+      }
+    } catch {
+      setAiMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: 'Désolé, une erreur est survenue lors de l’analyse. Pouvez-vous reformuler votre demande ?'
+        }
+      ]);
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  function applyGeneratedWorkflow() {
+    if (!aiGeneratedWf) return;
+    setWorkflow(aiGeneratedWf);
+    setAiArchitectOpen(false);
+    setSaveFeedback(`✨ Workflow « ${aiGeneratedWf.name} » appliqué avec succès !`);
+    setTimeout(() => setSaveFeedback(null), 3000);
+    setTimeout(() => {
+      autoLayoutTree();
+      startSimulator();
+    }, 200);
+  }
+
+  // ── EXPORTATION & IMPORTATION JSON ────────────────────────────────────────
   function exportWorkflowJson() {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(workflow, null, 2));
     const dlAnchor = document.createElement('a');
@@ -449,7 +513,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
     }));
   }
 
-  // ── SIMULATEUR DE WORKFLOW AVEC CONDITIONS PERSONA (SUPER-POUVOIR 3) ──────
+  // ── SIMULATEUR DE WORKFLOW AVEC CONDITIONS PERSONA ────────────────────────
   const startSimulator = useCallback(() => {
     setSimulatorOpen(true);
     setSimHistory([]);
@@ -578,7 +642,6 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-white select-none overflow-hidden animate-fade-in font-sans">
-      {/* Input de fichier caché pour Import JSON */}
       <input
         ref={fileInputRef}
         type="file"
@@ -633,7 +696,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
             />
           </div>
 
-          {/* Mode Brouillon vs Publié (SUPER-POUVOIR 1) */}
+          {/* Mode Brouillon vs Publié */}
           <button
             type="button"
             onClick={() => setWorkflow({ ...workflow, enabled: !workflow.enabled })}
@@ -665,34 +728,42 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Bouton Aligner l'arbre (SUPER-POUVOIR 2) */}
+          {/* BOUTON ARCHITECTE IA CONVERSATIONNEL */}
+          <button
+            type="button"
+            onClick={() => setAiArchitectOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-lg hover:opacity-90 transition active:scale-95"
+          >
+            <span>✨</span>
+            <span>Architecte IA</span>
+          </button>
+
+          {/* Bouton Aligner l'arbre */}
           <button
             type="button"
             onClick={autoLayoutTree}
             className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-white/20 transition active:scale-95"
-            title="Ranger automatiquement tous les blocs avec un espacement idéal"
+            title="Ranger automatiquement tous les blocs"
           >
             <span>✨</span>
-            <span>Aligner l'arbre</span>
+            <span>Aligner</span>
           </button>
 
-          {/* Menu Export / Import (SUPER-POUVOIR 6) */}
+          {/* Menu Export / Import */}
           <div className="hidden lg:flex items-center gap-1">
             <button
               type="button"
               onClick={exportWorkflowJson}
               className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-white/80 hover:bg-white/10 hover:text-white"
-              title="Télécharger le fichier JSON du flux"
             >
-              📤 Export JSON
+              📤 Export
             </button>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-white/80 hover:bg-white/10 hover:text-white"
-              title="Importer un fichier JSON de flux"
             >
-              📥 Import JSON
+              📥 Import
             </button>
           </div>
 
@@ -716,7 +787,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
             <span>Tester</span>
           </button>
 
-          {/* Bouton Enregistrer / Publier */}
+          {/* Bouton Enregistrer */}
           <button
             type="button"
             onClick={() => {
@@ -732,7 +803,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
         </div>
       </header>
 
-      {/* Toast de confirmation de sauvegarde */}
+      {/* Toast de confirmation */}
       {saveFeedback && (
         <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 rounded-2xl border border-emerald-500/50 bg-emerald-950/90 px-4 py-2 text-xs font-bold text-emerald-200 shadow-2xl backdrop-blur-md animate-slide-up">
           {saveFeedback}
@@ -751,7 +822,6 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
           'bg-[radial-gradient(#ffffff15_1px,transparent_1px)] [background-size:24px_24px]'
         )}
       >
-        {/* Conteneur transformé (Pan & Zoom) */}
         <div
           style={{
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
@@ -870,7 +940,6 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                     !isSelected && !isTestActive && !isVisited && !isError && 'border-white/10 bg-slate-900/85 hover:border-white/30 z-10'
                   )}
                 >
-                  {/* Badge en cours de test */}
                   {isTestActive && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-sky-500 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-950 shadow-lg flex items-center gap-1 animate-pulse">
                       <span>🟢</span>
@@ -878,7 +947,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                     </div>
                   )}
 
-                  {/* En-tête coloré */}
+                  {/* En-tête */}
                   <div
                     className={cn(
                       'flex items-center justify-between rounded-t-2xl px-3.5 py-2 text-xs font-bold border-b border-white/10',
@@ -901,7 +970,6 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                     </div>
 
                     <div className="flex items-center gap-1">
-                      {/* Bouton Dupliquer 1-clic (SUPER-POUVOIR 4) */}
                       <button
                         type="button"
                         onClick={(e) => {
@@ -937,7 +1005,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                     </div>
                   </div>
 
-                  {/* Corps du bloc */}
+                  {/* Corps */}
                   <div className="p-3 text-xs space-y-2 text-white/80">
                     {node.type === 'trigger' && (
                       <div className="space-y-1">
@@ -1005,7 +1073,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                     )}
                   </div>
 
-                  {/* Connecteur de sortie */}
+                  {/* Connecteur */}
                   <div
                     className={cn(
                       'absolute -bottom-2 left-1/2 -translate-x-1/2 flex items-center justify-center h-4 w-4 rounded-full border-2 border-slate-900 shadow-md',
@@ -1020,13 +1088,12 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
           </div>
         </div>
 
-        {/* ── CONTRÔLES DE ZOOM ET VUE ────────────────────────────────────────── */}
+        {/* ── CONTRÔLES ZOOM ──────────────────────────────────────────────────── */}
         <div className="canvas-ui absolute bottom-6 right-6 flex items-center gap-1 rounded-2xl border border-white/10 bg-slate-900/90 p-1.5 shadow-2xl backdrop-blur-md z-30">
           <button
             type="button"
             onClick={() => setZoom((z) => Math.max(0.4, Number((z - 0.15).toFixed(2))))}
             className="flex h-8 w-8 items-center justify-center rounded-xl text-white/80 hover:bg-white/10 hover:text-white transition"
-            title="Zoom arrière"
           >
             -
           </button>
@@ -1037,7 +1104,6 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
             type="button"
             onClick={() => setZoom((z) => Math.min(1.8, Number((z + 0.15).toFixed(2))))}
             className="flex h-8 w-8 items-center justify-center rounded-xl text-white/80 hover:bg-white/10 hover:text-white transition"
-            title="Zoom avant"
           >
             +
           </button>
@@ -1078,6 +1144,168 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
           </div>
         </div>
       </div>
+
+      {/* ── MODALE ARCHITECTE IA CONVERSATIONNEL (PROMPT-TO-WORKFLOW) ───────── */}
+      {aiArchitectOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
+          <div className="w-full max-w-2xl rounded-3xl border border-white/20 bg-slate-900 shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-white/10 bg-slate-900/95 px-5 py-3.5">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 to-purple-600 text-sm shadow-md">
+                  ✨
+                </div>
+                <div>
+                  <h3 className="font-display text-sm font-bold text-white">
+                    Architecte IA Mistral — Prompt-to-Workflow
+                  </h3>
+                  <p className="text-[11px] text-white/50">
+                    Décrivez votre idée en français, l'IA vous conseille et génère tout l'arbre décisionnel.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAiArchitectOpen(false)}
+                className="rounded-xl p-1.5 text-white/40 hover:text-white hover:bg-white/10"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Suggestions rapides si début */}
+            {aiMessages.length <= 1 && (
+              <div className="bg-slate-950/50 p-3 border-b border-white/10 space-y-1.5">
+                <p className="text-[10.5px] font-bold text-white/50 uppercase tracking-wider">
+                  💡 Idées de départ rapides (1-clic) :
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleSendAiPrompt(
+                        'Je veux un scénario de qualification de devis : demander si Particulier ou Entreprise, le budget, puis taguer et alerter les commerciaux.'
+                      )
+                    }
+                    className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/80 hover:bg-white/15 hover:text-white transition text-left"
+                  >
+                    🏢 Qualification Devis Commercial
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleSendAiPrompt(
+                        'Je veux un scénario e-commerce pour les retours produits 14 jours : vérifier l’état du colis, demander le numéro de commande et orienter.'
+                      )
+                    }
+                    className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/80 hover:bg-white/15 hover:text-white transition text-left"
+                  >
+                    📦 Retours & SAV 14 Jours
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleSendAiPrompt(
+                        'Je veux un scénario d’accueil hors horaires le soir et week-end : informer de l’absence et collecter email/téléphone pour rappel à 9h.'
+                      )
+                    }
+                    className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/80 hover:bg-white/15 hover:text-white transition text-left"
+                  >
+                    🌙 Accueil Hors Horaires & Nuit
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Fil de discussion */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 text-xs">
+              {aiMessages.map((msg, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    'flex flex-col gap-1',
+                    msg.role === 'user' ? 'items-end' : 'items-start'
+                  )}
+                >
+                  <div
+                    className={cn(
+                      'rounded-2xl px-4 py-3 max-w-[85%] leading-relaxed',
+                      msg.role === 'user'
+                        ? 'bg-blue-600 text-white font-medium shadow-sm'
+                        : 'bg-slate-800/90 text-white/90 border border-white/10 shadow-sm'
+                    )}
+                  >
+                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                  </div>
+                </div>
+              ))}
+
+              {/* État de chargement */}
+              {aiLoading && (
+                <div className="flex items-center gap-2 text-xs text-white/60 p-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-amber-400 border-t-transparent" />
+                  <span>L'Architecte IA analyse et conçoit votre arbre décisionnel...</span>
+                </div>
+              )}
+
+              {/* Carte de déploiement si prêt */}
+              {aiGeneratedWf && !aiLoading && (
+                <div className="rounded-2xl border border-emerald-500/40 bg-emerald-950/30 p-4 space-y-3 animate-slide-up shadow-xl">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">🎉</span>
+                      <div>
+                        <h4 className="font-display text-sm font-bold text-white">
+                          {aiGeneratedWf.name}
+                        </h4>
+                        <p className="text-[11px] text-emerald-300">
+                          {aiGeneratedWf.nodes.length} nœuds générés · {aiGeneratedWf.edges.length} connexions automatiques
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-white/70 leading-relaxed">{aiGeneratedWf.description}</p>
+
+                  <button
+                    type="button"
+                    onClick={applyGeneratedWorkflow}
+                    className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-lagoon-500 py-2.5 text-xs font-bold text-slate-950 shadow-glow transition hover:opacity-90 active:scale-98 flex items-center justify-center gap-2"
+                  >
+                    <span>🚀 Déployer sur le Canvas & Tester en Direct</span>
+                    <span>&rarr;</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Zone de saisie */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSendAiPrompt();
+              }}
+              className="border-t border-white/10 bg-slate-900/95 p-3 flex items-center gap-2"
+            >
+              <input
+                type="text"
+                value={aiInput}
+                onChange={(e) => setAiInput(e.target.value)}
+                placeholder="Décrivez votre scénario ou répondez aux questions de l'IA..."
+                disabled={aiLoading}
+                className="flex-1 rounded-xl border border-white/15 bg-slate-800 px-3.5 py-2.5 text-xs text-white outline-none focus:border-lagoon-400 placeholder:text-white/40"
+              />
+              <button
+                type="submit"
+                disabled={aiLoading || !aiInput.trim()}
+                className="rounded-xl bg-gradient-to-r from-amber-500 to-purple-600 px-4 py-2.5 text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-40 active:scale-95 shadow-md shrink-0"
+              >
+                Envoyer
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ── TIROIR D'AFFICHAGE DES DIAGNOSTICS & ANOMALIES ─────────────────── */}
       {diagnosticsOpen && (
@@ -1203,7 +1431,6 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                           </button>
                         </div>
 
-                        {/* Sélecteur de bloc cible */}
                         <div className="flex items-center gap-1.5 text-[11px] text-white/60">
                           <span>Branche vers :</span>
                           <select
@@ -1372,7 +1599,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
         </div>
       )}
 
-      {/* ── SIMULATEUR AVEC SÉLECTEUR DE PERSONA (SUPER-POUVOIR 3) ──────────── */}
+      {/* ── SIMULATEUR AVEC SÉLECTEUR DE PERSONA ────────────────────────────── */}
       {simulatorOpen && (
         <div className="fixed top-16 right-6 z-50 w-84 sm:w-96 rounded-3xl border border-white/20 bg-slate-900/95 shadow-2xl backdrop-blur-2xl p-4 space-y-3 animate-slide-up flex flex-col max-h-[82vh]">
           <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
@@ -1406,7 +1633,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
             </div>
           </div>
 
-          {/* Sélecteur de Persona / Contexte de Test (SUPER-POUVOIR 3) */}
+          {/* Sélecteur de Persona */}
           <div className="rounded-2xl border border-white/10 bg-slate-800/80 p-2 text-xs flex items-center justify-between gap-2">
             <span className="text-[10.5px] font-bold text-white/60">🎭 Contexte :</span>
             <div className="flex items-center gap-1.5">
@@ -1445,7 +1672,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
             </div>
           </div>
 
-          {/* Bandeau d'alerte si une erreur est détectée */}
+          {/* Bandeau d'alerte */}
           {currentTestError && (
             <div className="rounded-xl border border-rose-500/50 bg-rose-500/20 p-2.5 text-xs text-rose-200 flex items-start gap-2 animate-shake">
               <span>🚨</span>
@@ -1472,7 +1699,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                   <p className="whitespace-pre-wrap">{item.text}</p>
                 </div>
 
-                {/* Boutons d'options interactifs */}
+                {/* Boutons d'options */}
                 {item.options && item.options.length > 0 && (
                   <div className="flex flex-col gap-1.5 w-full pt-1">
                     {item.options.map((opt) => (
