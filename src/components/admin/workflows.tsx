@@ -2,17 +2,21 @@
 
 /**
  * Gestionnaire des workflows intelligents et automatisations (Freshchat / Intercom style).
- * Moteur visuel No-Code (Déclencheur -> Conditions -> Multi-actions chaînées)
- * avec bibliothèque de modèles prêts à l'emploi et statistiques d'exécution en temps réel.
+ * Moteur visuel No-Code (Flow Canvas par nœuds et branches + mode tableau de bord)
+ * avec bibliothèque de modèles prêts à l'emploi et simulateur interactif.
  */
 
 import { useEffect, useState } from 'react';
 import { Card, EmptyState, Field, FormNotice, SaveButton, SectionHeader, SkeletonCard, inputCls } from './parts';
 import { type WorkflowActionType, type WorkflowRule, type WorkflowTriggerType, WORKFLOW_TEMPLATES } from '@/lib/workflow-types';
+import { type VisualWorkflow, VISUAL_WORKFLOW_TEMPLATES } from '@/lib/visual-workflow';
+import { FlowCanvas } from './flow-canvas';
 import { cn, timeAgo } from '@/lib/utils';
 
 export function WorkflowsPanel() {
   const [workflows, setWorkflows] = useState<WorkflowRule[]>(WORKFLOW_TEMPLATES);
+  const [visualWorkflows, setVisualWorkflows] = useState<VisualWorkflow[]>(VISUAL_WORKFLOW_TEMPLATES);
+  const [activeVisualWf, setActiveVisualWf] = useState<VisualWorkflow | null>(null);
   const [editingWf, setEditingWf] = useState<WorkflowRule | null>(null);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -26,26 +30,44 @@ export function WorkflowsPanel() {
         if (Array.isArray(j.workflows) && j.workflows.length > 0) {
           setWorkflows(j.workflows);
         }
+        if (Array.isArray(j.visualWorkflows) && j.visualWorkflows.length > 0) {
+          setVisualWorkflows(j.visualWorkflows);
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  async function saveWorkflowsList(list: WorkflowRule[]) {
+  async function saveWorkflowsList(list: WorkflowRule[], vList?: VisualWorkflow[]) {
     setBusy(true);
     setNotice(null);
     const res = await fetch('/api/admin/advanced-settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ section: 'workflows', data: list })
+      body: JSON.stringify({
+        section: 'workflows',
+        data: list,
+        visualWorkflows: vList || visualWorkflows
+      })
     });
     if (res.ok) {
       setWorkflows(list);
-      setNotice({ kind: 'ok', text: 'Workflows et automatisations enregistrés avec succès.' });
+      if (vList) setVisualWorkflows(vList);
+      setNotice({ kind: 'ok', text: 'Workflows et scénarios visuels enregistrés avec succès.' });
     } else {
       setNotice({ kind: 'error', text: 'Impossible d’enregistrer les workflows.' });
     }
     setBusy(false);
+  }
+
+  function handleSaveVisualWf(savedWf: VisualWorkflow) {
+    const exists = visualWorkflows.some((w) => w.id === savedWf.id);
+    const updated = exists
+      ? visualWorkflows.map((w) => (w.id === savedWf.id ? savedWf : w))
+      : [savedWf, ...visualWorkflows];
+    setVisualWorkflows(updated);
+    saveWorkflowsList(workflows, updated);
+    setActiveVisualWf(null);
   }
 
   function toggleWorkflow(id: string) {
@@ -133,7 +155,29 @@ export function WorkflowsPanel() {
     setEditingWf(newWf);
   }
 
-  // ── VUE ÉDITEUR DE WORKFLOW ────────────────────────────────────────────────
+  function openVisualTemplate(vTmpl: VisualWorkflow) {
+    const newWf: VisualWorkflow = {
+      ...vTmpl,
+      id: `vwf_${Date.now()}`,
+      execution_count: 0,
+      last_executed_at: null
+    };
+    setTemplatePickerOpen(false);
+    setActiveVisualWf(newWf);
+  }
+
+  // ── VUE DU STUDIO VISUEL PLEIN ÉCRAN (FLOW CANVAS) ────────────────────────
+  if (activeVisualWf) {
+    return (
+      <FlowCanvas
+        workflow={activeVisualWf}
+        onSave={handleSaveVisualWf}
+        onClose={() => setActiveVisualWf(null)}
+      />
+    );
+  }
+
+  // ── VUE ÉDITEUR CLASSIQUE ──────────────────────────────────────────────────
   if (editingWf) {
     return (
       <form onSubmit={saveEdited} className="space-y-4 animate-fade-in">
@@ -422,18 +466,28 @@ export function WorkflowsPanel() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <SectionHeader
-          title="Workflows & Automatisations Métier"
-          description="Pilotez vos scénarios No-Code (SI ... ALORS ...) pour router les leads, auto-répondre, relancer les paniers et taguer les conversations."
+          title="Workflows & Studio Visuel No-Code"
+          description="Pilotez vos scénarios No-Code par nœuds et branches pour aiguiller les visiteurs, automatiser le support et router les opportunités."
         />
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Bouton pour ouvrir le Studio Visuel */}
+          <button
+            type="button"
+            onClick={() => setActiveVisualWf(visualWorkflows[0] || VISUAL_WORKFLOW_TEMPLATES[0])}
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-lagoon-600 px-4 py-2 text-xs font-bold text-white shadow-lg hover:from-blue-500 hover:to-lagoon-500 transition active:scale-95"
+          >
+            <span>🎨</span>
+            <span>Ouvrir le Studio Visuel (Flow Canvas)</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setTemplatePickerOpen(true)}
             className="inline-flex items-center gap-1.5 rounded-xl border border-mist-300 bg-white px-3.5 py-2 text-xs font-semibold text-ink shadow-sm transition hover:bg-mist hover:border-mist-400 active:scale-95"
           >
             <span>✨</span>
-            <span>Bibliothèque de Modèles</span>
+            <span>Modèles Prêts à l&apos;Emploi</span>
           </button>
 
           <button
@@ -448,17 +502,46 @@ export function WorkflowsPanel() {
 
       <FormNotice kind={notice?.kind ?? 'ok'} text={notice?.text ?? null} />
 
+      {/* ── BANNIÈRE PROMOTIONNELLE STUDIO VISUEL FLOW CANVAS ─────────────── */}
+      <div className="rounded-3xl border border-blue-500/30 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 text-white shadow-xl relative overflow-hidden">
+        <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-[radial-gradient(#38bdf820_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none opacity-50" />
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="space-y-1.5 max-w-xl">
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/20 px-3 py-0.5 text-[11px] font-bold text-sky-300 border border-sky-500/30">
+              <span>✨ Flow Builder Visuel par Nœuds & Branches</span>
+            </div>
+            <h3 className="font-display text-lg font-bold text-white tracking-tight">
+              Créez des arbres décisionnels complets avec boutons interactifs
+            </h3>
+            <p className="text-xs text-white/70 leading-relaxed">
+              Modélisez vos scénarios complexes sur une grille infinie avec zoom, mini-map, questions à choix multiples (Oui/Non, bifurcations Chrome/Edge/Safari) et testez-les en direct avec le simulateur.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveVisualWf(visualWorkflows[0] || VISUAL_WORKFLOW_TEMPLATES[0])}
+              className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-sky-400 to-lagoon-400 px-5 py-2.5 text-xs font-bold text-slate-950 shadow-glow hover:opacity-90 transition active:scale-95 shrink-0"
+            >
+              <span>🚀 Lancer le Studio Visuel</span>
+              <span>&rarr;</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* ── MODALE BIBLIOTHÈQUE DE MODÈLES ───────────────────────────────── */}
       {templatePickerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/50 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="w-full max-w-2xl rounded-3xl border border-mist-300 bg-white p-6 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="w-full max-w-3xl rounded-3xl border border-mist-300 bg-white p-6 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-mist-200 pb-3">
               <div>
                 <h3 className="font-display text-base font-bold text-ink">
-                  ✨ Bibliothèque de Scénarios Prêts à l&apos;Emploi
+                  ✨ Bibliothèque de Scénarios & Flow Charts Visuels
                 </h3>
                 <p className="text-xs text-ink-500">
-                  Installez des automatisations éprouvées pour votre support et vos ventes en 1 clic.
+                  Installez des arbres décisionnels et automatisations éprouvées en 1 clic.
                 </p>
               </div>
               <button
@@ -470,26 +553,63 @@ export function WorkflowsPanel() {
               </button>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              {WORKFLOW_TEMPLATES.map((tmpl) => (
-                <div
-                  key={tmpl.id}
-                  className="flex flex-col justify-between rounded-2xl border border-mist-200 bg-mist-50/50 p-4 transition hover:border-lagoon-300 hover:bg-white hover:shadow-panel"
-                >
-                  <div>
-                    <h4 className="font-display text-xs font-bold text-ink">{tmpl.name}</h4>
-                    <p className="mt-1 text-[11px] text-ink-500 leading-relaxed">{tmpl.description}</p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => addTemplate(tmpl)}
-                    className="mt-3.5 w-full rounded-xl bg-lagoon-600 py-1.5 text-xs font-semibold text-white transition hover:bg-lagoon-500 shadow-sm"
+            {/* Section 1 : Modèles Visuels par Nœuds (Flow Canvas) */}
+            <div className="space-y-3">
+              <p className="text-xs font-bold uppercase tracking-wider text-lagoon-700">
+                Arbres Décisionnels Visuels (Flow Builder)
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {VISUAL_WORKFLOW_TEMPLATES.map((tmpl) => (
+                  <div
+                    key={tmpl.id}
+                    className="flex flex-col justify-between rounded-2xl border border-lagoon-200 bg-gradient-to-br from-lagoon-50/40 via-white to-sky-50/40 p-4 transition hover:shadow-card-hover"
                   >
-                    Utiliser ce modèle &rarr;
-                  </button>
-                </div>
-              ))}
+                    <div>
+                      <div className="flex items-center gap-1.5 text-[10.5px] font-bold text-lagoon-700 mb-1">
+                        <span>🎨 {tmpl.nodes.length} nœuds connectés</span>
+                      </div>
+                      <h4 className="font-display text-xs font-bold text-ink">{tmpl.name}</h4>
+                      <p className="mt-1 text-[11px] text-ink-600 leading-relaxed">{tmpl.description}</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => openVisualTemplate(tmpl)}
+                      className="mt-3.5 w-full rounded-xl bg-gradient-to-r from-blue-600 to-lagoon-600 py-2 text-xs font-bold text-white transition hover:opacity-90 shadow-sm"
+                    >
+                      Ouvrir dans le Studio Visuel &rarr;
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Section 2 : Scénarios Simples */}
+            <div className="space-y-3 pt-3 border-t border-mist-200">
+              <p className="text-xs font-bold uppercase tracking-wider text-ink-500">
+                Scénarios Rapides (Règles Linéaires)
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {WORKFLOW_TEMPLATES.map((tmpl) => (
+                  <div
+                    key={tmpl.id}
+                    className="flex flex-col justify-between rounded-2xl border border-mist-200 bg-mist-50/50 p-4 transition hover:border-lagoon-300 hover:bg-white"
+                  >
+                    <div>
+                      <h4 className="font-display text-xs font-bold text-ink">{tmpl.name}</h4>
+                      <p className="mt-1 text-[11px] text-ink-500 leading-relaxed">{tmpl.description}</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => addTemplate(tmpl)}
+                      className="mt-3.5 w-full rounded-xl bg-lagoon-600 py-1.5 text-xs font-semibold text-white transition hover:bg-lagoon-500 shadow-sm"
+                    >
+                      Utiliser ce modèle &rarr;
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -606,8 +726,20 @@ export function WorkflowsPanel() {
 
                   <button
                     type="button"
+                    onClick={() => {
+                      // Ouvre directement dans le Flow Canvas Studio
+                      const matchingVisual = visualWorkflows.find((v) => v.name.includes(wf.name.slice(0, 10))) || visualWorkflows[0];
+                      setActiveVisualWf(matchingVisual);
+                    }}
+                    className="rounded-xl border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition"
+                  >
+                    🎨 Studio Visuel
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => setEditingWf(wf)}
-                    className="rounded-xl border border-mist-300 bg-white px-3 py-1.5 text-xs font-semibold text-lagoon-700 hover:bg-lagoon-50 hover:border-lagoon-300 transition"
+                    className="rounded-xl border border-mist-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-ink-600 hover:bg-mist transition"
                   >
                     Modifier
                   </button>
