@@ -472,7 +472,7 @@ export function WorkflowsPanel() {
           <button
             type="button"
             onClick={() => setTemplatePickerOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-mist-300 bg-white px-3 py-1.5 text-xs font-semibold text-ink shadow-2xs transition hover:bg-mist active:scale-95"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-mist-300 bg-white px-3 py-1.5 text-xs font-semibold text-ink shadow-sm transition hover:bg-mist active:scale-95"
           >
             <span>✨ Modèles</span>
           </button>
@@ -530,7 +530,7 @@ export function WorkflowsPanel() {
                   <button
                     type="button"
                     onClick={() => openVisualTemplate(tmpl)}
-                    className="mt-2.5 w-full rounded-lg bg-lagoon-600 py-1.5 text-xs font-semibold text-white transition hover:bg-lagoon-500 shadow-2xs"
+                    className="mt-2.5 w-full rounded-lg bg-lagoon-600 py-1.5 text-xs font-semibold text-white transition hover:bg-lagoon-500 shadow-sm"
                   >
                     Ouvrir &rarr;
                   </button>
