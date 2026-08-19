@@ -2,14 +2,7 @@
 
 /**
  * Studio de Workflows Visuel No-Code Luminae (Flow Canvas).
- * Canvas interactif par nœuds et câbles courbes SVG avec :
- * 1. Architecte IA Conversationnel (Prompt-to-Flow avec clarification)
- * 2. Mode Brouillon vs Publier en direct
- * 3. Auto-Layout (« ✨ Aligner l'arbre »)
- * 4. Simulateur de Persona (Heures ouvrées vs Hors horaires / Mobile vs PC)
- * 5. Duplication / Cloner 1-clic de bloc
- * 6. Historique Annuler / Rétablir (Ctrl+Z / Ctrl+Y)
- * 7. Exportation & Importation JSON
+ * Design épuré, compact et ultra-lisible (Blocs affinés, typographie nette, aération maximale).
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -66,7 +59,6 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
     }
   }, [history, historyIdx]);
 
-  // Raccourcis clavier Ctrl+Z / Ctrl+Y
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
@@ -86,21 +78,19 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
 
-  // ── ÉTAT DE VUE ET DE PAN / ZOOM ──────────────────────────────────────────
-  const [zoom, setZoom] = useState<number>(1);
-  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  // ── ÉTAT PAN & ZOOM ───────────────────────────────────────────────────────
+  const [zoom, setZoom] = useState<number>(0.95);
+  const [pan, setPan] = useState<{ x: number; y: number }>({ x: 40, y: 30 });
   const [isPanning, setIsPanning] = useState(false);
   const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Nœud en cours de déplacement
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const [nodeOffset, setNodeOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Nœud sélectionné pour édition dans le tiroir latéral
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const selectedNode = workflow.nodes.find((n) => n.id === selectedNodeId) ?? null;
 
-  // ── SURVEILLANCE DU TEST ET SIMULATEUR DE CONDITIONS ──────────────────────
+  // ── SURVEILLANCE DU TEST ET CONDITIONS ────────────────────────────────────
   const [simulatorOpen, setSimulatorOpen] = useState(false);
   const [simHistory, setSimHistory] = useState<
     Array<{ sender: 'bot' | 'visitor'; text: string; options?: ChoiceOption[]; isError?: boolean }>
@@ -111,21 +101,19 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
   const [activeEdgeId, setActiveEdgeId] = useState<string | null>(null);
   const [currentTestError, setCurrentTestError] = useState<{ nodeId: string; message: string } | null>(null);
 
-  // Variables de simulation de Persona
   const [simHoursMode, setSimHoursMode] = useState<'open' | 'closed'>('open');
 
-  // Palette & Diagnostics
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
 
-  // ── ARCHITECTE IA CONVERSATIONNEL (PROMPT-TO-WORKFLOW) ────────────────────
+  // ── ARCHITECTE IA ─────────────────────────────────────────────────────────
   const [aiArchitectOpen, setAiArchitectOpen] = useState(false);
   const [aiMessages, setAiMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([
     {
       role: 'assistant',
       content:
-        'Bonjour ! Je suis votre Architecte IA. Décrivez-moi le scénario que vous souhaitez créer (ex: qualification de leads devis, gestion des retours 14j, dépannage technique, accueil nuit...) et je vais le dessiner pour vous. Si besoin, je vous poserai des questions pour affiner les choix !'
+        'Bonjour ! Décrivez-moi le scénario que vous souhaitez créer et je vais concevoir l’arbre complet pour vous. Si besoin, je vous poserai quelques questions pour affiner les choix !'
     }
   ]);
   const [aiInput, setAiInput] = useState('');
@@ -135,7 +123,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
   const canvasRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ── DIAGNOSTIC AUTOMATIQUE DE SANTÉ DU WORKFLOW ───────────────────────────
+  // ── DIAGNOSTICS DE SANTÉ ──────────────────────────────────────────────────
   const diagnostics = useMemo(() => {
     const issues: Array<{
       nodeId: string;
@@ -152,7 +140,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
             nodeId: node.id,
             nodeTitle: node.title,
             kind: 'empty',
-            message: 'Aucun bouton de choix configuré.'
+            message: 'Aucun bouton configuré.'
           });
         }
         for (const opt of options) {
@@ -164,7 +152,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
               nodeId: node.id,
               nodeTitle: node.title,
               kind: 'unconnected',
-              message: `Le bouton « ${opt.label} » n'est relié à aucun bloc cible.`
+              message: `Bouton « ${opt.label} » non relié.`
             });
           }
         }
@@ -179,7 +167,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
             nodeId: node.id,
             nodeTitle: node.title,
             kind: 'unconnected',
-            message: 'Bloc orphelin : non relié au déclencheur du workflow.'
+            message: 'Bloc orphelin.'
           });
         }
       }
@@ -191,7 +179,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
             nodeId: node.id,
             nodeTitle: node.title,
             kind: 'dead_end',
-            message: 'Impasse : ce bloc ne poursuit vers aucune action ou question.'
+            message: 'Impasse : aucune suite.'
           });
         }
       }
@@ -205,13 +193,13 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
     if (!node || !canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
     setPan({
-      x: rect.width / 2 - (node.position.x + 120) * zoom,
-      y: rect.height / 2 - (node.position.y + 60) * zoom
+      x: rect.width / 2 - (node.position.x + 100) * zoom,
+      y: rect.height / 2 - (node.position.y + 40) * zoom
     });
     setSelectedNodeId(nodeId);
   }
 
-  // ── AUTO-LAYOUT : RANGER ET ALIGNER L'ARBRE ──────────────────────────────
+  // ── AUTO-LAYOUT ÉPURÉ ET COMPACT ──────────────────────────────────────────
   function autoLayoutTree() {
     const root = workflow.nodes.find((n) => n.type === 'trigger') || workflow.nodes[0];
     if (!root) return;
@@ -252,26 +240,26 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
 
     for (let l = 0; l <= maxLvl; l++) {
       const nodesAtLvl = levelGroups.get(l) || [];
-      const totalWidth = nodesAtLvl.length * 280;
-      const startX = 600 - totalWidth / 2;
+      const totalWidth = nodesAtLvl.length * 230;
+      const startX = 500 - totalWidth / 2;
 
       nodesAtLvl.forEach((node, idx) => {
         updatedNodes.push({
           ...node,
           position: {
-            x: Math.round(startX + idx * 280),
-            y: 40 + l * 180
+            x: Math.round(startX + idx * 230),
+            y: 40 + l * 140
           }
         });
       });
     }
 
     setWorkflow((prev) => ({ ...prev, nodes: updatedNodes }));
-    setZoom(0.85);
-    setPan({ x: 100, y: 50 });
+    setZoom(0.95);
+    setPan({ x: 80, y: 40 });
   }
 
-  // ── DUPLIQUER / CLONER UN BLOC ───────────────────────────────────────────
+  // ── DUPLIQUER UN BLOC ─────────────────────────────────────────────────────
   function duplicateNode(nodeId: string) {
     const src = workflow.nodes.find((n) => n.id === nodeId);
     if (!src) return;
@@ -282,8 +270,8 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
       id: newId,
       title: `${src.title} (Copie)`,
       position: {
-        x: src.position.x + 30,
-        y: src.position.y + 40
+        x: src.position.x + 25,
+        y: src.position.y + 30
       },
       data: {
         ...src.data,
@@ -301,7 +289,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
     setSelectedNodeId(newId);
   }
 
-  // ── ENVOI À L'ARCHITECTE IA (PROMPT-TO-FLOW) ──────────────────────────────
+  // ── ENVOI ARCHITECTE IA ───────────────────────────────────────────────────
   async function handleSendAiPrompt(overrideText?: string) {
     const textToSend = (overrideText || aiInput).trim();
     if (!textToSend || aiLoading) return;
@@ -333,10 +321,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
     } catch {
       setAiMessages((prev) => [
         ...prev,
-        {
-          role: 'assistant',
-          content: 'Désolé, une erreur est survenue lors de l’analyse. Pouvez-vous reformuler votre demande ?'
-        }
+        { role: 'assistant', content: 'Une erreur est survenue. Pouvez-vous reformuler votre demande ?' }
       ]);
     } finally {
       setAiLoading(false);
@@ -347,15 +332,15 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
     if (!aiGeneratedWf) return;
     setWorkflow(aiGeneratedWf);
     setAiArchitectOpen(false);
-    setSaveFeedback(`✨ Workflow « ${aiGeneratedWf.name} » appliqué avec succès !`);
-    setTimeout(() => setSaveFeedback(null), 3000);
+    setSaveFeedback(`✨ « ${aiGeneratedWf.name} » chargé !`);
+    setTimeout(() => setSaveFeedback(null), 2500);
     setTimeout(() => {
       autoLayoutTree();
       startSimulator();
-    }, 200);
+    }, 150);
   }
 
-  // ── EXPORTATION & IMPORTATION JSON ────────────────────────────────────────
+  // ── EXPORT / IMPORT JSON ──────────────────────────────────────────────────
   function exportWorkflowJson() {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(workflow, null, 2));
     const dlAnchor = document.createElement('a');
@@ -373,8 +358,8 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
         const parsed = JSON.parse(event.target?.result as string);
         if (parsed.nodes && Array.isArray(parsed.nodes)) {
           setWorkflow(parsed);
-          setSaveFeedback('✨ Workflow importé avec succès !');
-          setTimeout(() => setSaveFeedback(null), 3000);
+          setSaveFeedback('✨ Import réussi !');
+          setTimeout(() => setSaveFeedback(null), 2500);
         }
       } catch {
         alert('Fichier JSON invalide.');
@@ -383,7 +368,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
     reader.readAsText(file);
   }
 
-  // ── DÉPLACEMENT PAN & ZOOM DU CANVAS ──────────────────────────────────────
+  // ── PAN & ZOOM ────────────────────────────────────────────────────────────
   function handleMouseDown(e: React.MouseEvent) {
     if (
       (e.target as HTMLElement).closest('.flow-node') ||
@@ -404,7 +389,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
       setWorkflowState((prev) => ({
         ...prev,
         nodes: prev.nodes.map((n) =>
-          n.id === draggingNodeId ? { ...n, position: { x: Math.max(20, newX), y: Math.max(20, newY) } } : n
+          n.id === draggingNodeId ? { ...n, position: { x: Math.max(10, newX), y: Math.max(10, newY) } } : n
         )
       }));
     }
@@ -419,7 +404,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
       const delta = e.deltaY > 0 ? -0.1 : 0.1;
-      setZoom((z) => Math.min(1.8, Math.max(0.4, Number((z + delta).toFixed(2)))));
+      setZoom((z) => Math.min(1.6, Math.max(0.5, Number((z + delta).toFixed(2)))));
     }
   }
 
@@ -434,32 +419,32 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
     });
   }
 
-  // ── AJOUTER UN NOUVEAU NŒUD ───────────────────────────────────────────────
+  // ── AJOUT NŒUD ────────────────────────────────────────────────────────────
   function addNode(type: FlowNodeType) {
     const id = `node_${Date.now()}`;
-    const x = Math.round((-pan.x + 300) / zoom / 10) * 10;
-    const y = Math.round((-pan.y + 200) / zoom / 10) * 10;
+    const x = Math.round((-pan.x + 280) / zoom / 10) * 10;
+    const y = Math.round((-pan.y + 150) / zoom / 10) * 10;
 
     let newNode: FlowNode;
     if (type === 'message') {
       newNode = {
         id,
         type: 'message',
-        title: '💬 Nouveau Message Bot',
+        title: '💬 Message Bot',
         position: { x, y },
-        data: { message: 'Bonjour ! Comment pouvons-nous vous aider aujourd’hui ?' }
+        data: { message: 'Bonjour ! Comment pouvons-nous vous aider ?' }
       };
     } else if (type === 'buttons') {
       newNode = {
         id,
         type: 'buttons',
-        title: '🔘 Choix & Boutons Visiteur',
+        title: '🔘 Choix Visiteur',
         position: { x, y },
         data: {
-          question: 'Que souhaitez-vous faire ?',
+          question: 'Votre choix :',
           options: [
-            { id: `opt_1_${Date.now()}`, label: 'Option A' },
-            { id: `opt_2_${Date.now()}`, label: 'Option B' }
+            { id: `opt_1_${Date.now()}`, label: 'Option 1' },
+            { id: `opt_2_${Date.now()}`, label: 'Option 2' }
           ]
         }
       };
@@ -467,7 +452,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
       newNode = {
         id,
         type: 'condition',
-        title: '🔀 Condition (Horaires)',
+        title: '🔀 Horaires',
         position: { x, y },
         data: { conditionType: 'business_hours' }
       };
@@ -475,9 +460,9 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
       newNode = {
         id,
         type: 'action',
-        title: '🚀 Action Métier',
+        title: '🚀 Action',
         position: { x, y },
-        data: { actionType: 'add_tag', actionPayload: 'Nouveau Tag' }
+        data: { actionType: 'add_tag', actionPayload: 'Tag' }
       };
     }
 
@@ -513,7 +498,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
     }));
   }
 
-  // ── SIMULATEUR DE WORKFLOW AVEC CONDITIONS PERSONA ────────────────────────
+  // ── SIMULATEUR ────────────────────────────────────────────────────────────
   const startSimulator = useCallback(() => {
     setSimulatorOpen(true);
     setSimHistory([]);
@@ -533,11 +518,11 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
     if (!node) {
       setCurrentTestError({
         nodeId,
-        message: `Erreur : Le bloc cible (ID: ${nodeId}) n'existe pas.`
+        message: `Bloc cible introuvable.`
       });
       setSimHistory((prev) => [
         ...prev,
-        { sender: 'bot', text: `🚨 ERREUR : Le bloc cible n'a pas été trouvé.`, isError: true }
+        { sender: 'bot', text: `🚨 ERREUR : Bloc cible introuvable.`, isError: true }
       ]);
       return;
     }
@@ -551,16 +536,16 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
       const nextEdge = workflow.edges.find((e) => e.source === node.id);
       if (nextEdge) {
         setActiveEdgeId(nextEdge.id);
-        setTimeout(() => advanceSimulator(nextEdge.target), 600);
+        setTimeout(() => advanceSimulator(nextEdge.target), 500);
       } else {
-        setCurrentTestError({ nodeId: node.id, message: 'Le déclencheur n’est relié à aucun bloc suivant.' });
+        setCurrentTestError({ nodeId: node.id, message: 'Déclencheur non relié.' });
       }
     } else if (node.type === 'message') {
       setSimHistory((prev) => [...prev, { sender: 'bot', text: node.data.message || 'Message' }]);
       const nextEdge = workflow.edges.find((e) => e.source === node.id);
       if (nextEdge) {
         setActiveEdgeId(nextEdge.id);
-        setTimeout(() => advanceSimulator(nextEdge.target), 700);
+        setTimeout(() => advanceSimulator(nextEdge.target), 600);
       }
     } else if (node.type === 'buttons') {
       const options = node.data.options || [];
@@ -568,7 +553,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
         ...prev,
         {
           sender: 'bot',
-          text: node.data.question || 'Veuillez faire un choix :',
+          text: node.data.question || 'Faites un choix :',
           options
         }
       ]);
@@ -578,7 +563,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
         ...prev,
         {
           sender: 'bot',
-          text: `🔀 [Évaluation Condition : ${node.title}]\nSimulé en mode : ${isHoursOpen ? '☀️ Heures Ouvrées (Ouvert)' : '🌙 Nuit / Hors Horaires (Fermé)'}`
+          text: `🔀 [${node.title}] ➔ Mode : ${isHoursOpen ? '☀️ Ouvert' : '🌙 Nuit'}`
         }
       ]);
 
@@ -588,19 +573,19 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
 
       if (matchingEdge) {
         setActiveEdgeId(matchingEdge.id);
-        setTimeout(() => advanceSimulator(matchingEdge.target), 750);
+        setTimeout(() => advanceSimulator(matchingEdge.target), 650);
       } else {
-        setCurrentTestError({ nodeId: node.id, message: 'La condition n’a aucune branche de sortie connectée.' });
+        setCurrentTestError({ nodeId: node.id, message: 'Condition non reliée.' });
       }
     } else if (node.type === 'action') {
       setSimHistory((prev) => [
         ...prev,
-        { sender: 'bot', text: `🚀 [Action exécutée] : ${node.title} (${node.data.actionPayload || ''})` }
+        { sender: 'bot', text: `🚀 [Action] : ${node.title} (${node.data.actionPayload || ''})` }
       ]);
       const nextEdge = workflow.edges.find((e) => e.source === node.id);
       if (nextEdge) {
         setActiveEdgeId(nextEdge.id);
-        setTimeout(() => advanceSimulator(nextEdge.target), 700);
+        setTimeout(() => advanceSimulator(nextEdge.target), 600);
       }
     }
   }
@@ -620,25 +605,26 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
     if (matchingEdge) setActiveEdgeId(matchingEdge.id);
 
     if (targetId) {
-      setTimeout(() => advanceSimulator(targetId), 450);
+      setTimeout(() => advanceSimulator(targetId), 400);
     } else {
       setCurrentTestError({
         nodeId: activeTestNodeId,
-        message: `Le bouton « ${option.label} » n'est relié à aucun bloc cible (Impasse).`
+        message: `Bouton « ${option.label} » non relié (Impasse).`
       });
       setSimHistory((prev) => [
         ...prev,
         {
           sender: 'bot',
-          text: `🚨 IMPASSE DÉTECTÉE : Le bouton « ${option.label} » n'a pas de bloc cible relié.\nCliquez sur le bloc pour relier ce bouton.`,
+          text: `🚨 IMPASSE : Le bouton « ${option.label} » n'est relié à aucun bloc.`,
           isError: true
         }
       ]);
     }
   }
 
-  const nodeWidth = 240;
-  const nodeHeight = 130;
+  // Dimensions compactes et nettes des blocs
+  const nodeWidth = 200;
+  const nodeHeight = 85;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-950 text-white select-none overflow-hidden animate-fade-in font-sans">
@@ -650,25 +636,25 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
         className="hidden"
       />
 
-      {/* ── BARRE D'OUTILS SUPÉRIEURE ───────────────────────────────────────── */}
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-white/10 bg-slate-900/90 px-4 backdrop-blur-md z-30">
-        <div className="flex items-center gap-2.5">
+      {/* ── BARRE D'OUTILS SUPÉRIEURE ÉPURÉE ────────────────────────────────── */}
+      <header className="flex h-12 shrink-0 items-center justify-between border-b border-white/10 bg-slate-900/90 px-3.5 backdrop-blur-md z-30">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/90 hover:bg-white/10 hover:text-white transition active:scale-95"
+            className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-white/90 hover:bg-white/10 hover:text-white transition active:scale-95"
           >
             <span>&larr;</span>
             <span>Retour</span>
           </button>
 
-          {/* Boutons Undo / Redo */}
-          <div className="flex items-center rounded-xl border border-white/10 bg-white/5 p-0.5">
+          {/* Undo / Redo */}
+          <div className="flex items-center rounded-lg border border-white/10 bg-white/5 p-0.5">
             <button
               type="button"
               onClick={undo}
               disabled={historyIdx === 0}
-              className="px-2 py-1 text-xs text-white/70 hover:text-white disabled:opacity-30 rounded-lg hover:bg-white/10"
+              className="px-1.5 py-0.5 text-[11px] text-white/70 hover:text-white disabled:opacity-25 rounded hover:bg-white/10"
               title="Annuler (Ctrl+Z)"
             >
               ↩️
@@ -677,38 +663,37 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
               type="button"
               onClick={redo}
               disabled={historyIdx >= history.length - 1}
-              className="px-2 py-1 text-xs text-white/70 hover:text-white disabled:opacity-30 rounded-lg hover:bg-white/10"
+              className="px-1.5 py-0.5 text-[11px] text-white/70 hover:text-white disabled:opacity-25 rounded hover:bg-white/10"
               title="Rétablir (Ctrl+Y)"
             >
               ↪️
             </button>
           </div>
 
-          <div className="h-4 w-px bg-white/10 mx-0.5" />
+          <div className="h-3.5 w-px bg-white/10 mx-0.5" />
 
-          <div className="flex items-center gap-2">
-            <BotOrb size={20} glow />
+          <div className="flex items-center gap-1.5">
+            <BotOrb size={18} glow />
             <input
               type="text"
               value={workflow.name}
               onChange={(e) => setWorkflow({ ...workflow, name: e.target.value })}
-              className="bg-transparent font-display text-sm font-bold text-white outline-none border-b border-transparent hover:border-white/30 focus:border-lagoon-400 px-1 py-0.5"
+              className="bg-transparent font-display text-xs font-bold text-white outline-none border-b border-transparent hover:border-white/30 focus:border-lagoon-400 px-1 py-0.5 max-w-[160px] sm:max-w-xs truncate"
             />
           </div>
 
-          {/* Mode Brouillon vs Publié */}
+          {/* Statut */}
           <button
             type="button"
             onClick={() => setWorkflow({ ...workflow, enabled: !workflow.enabled })}
             className={cn(
-              'flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-semibold border transition active:scale-95',
+              'flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10.5px] font-medium border transition active:scale-95',
               workflow.enabled
-                ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-300'
-                : 'border-amber-500/40 bg-amber-500/20 text-amber-300'
+                ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
+                : 'border-amber-500/40 bg-amber-500/15 text-amber-300'
             )}
-            title="Basculer le statut de publication"
           >
-            <span>{workflow.enabled ? '🟢 Publié en direct' : '🛡️ Mode Brouillon'}</span>
+            <span>{workflow.enabled ? '● En ligne' : '○ Brouillon'}</span>
           </button>
 
           {/* Diagnostic Santé */}
@@ -716,96 +701,92 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
             type="button"
             onClick={() => setDiagnosticsOpen((o) => !o)}
             className={cn(
-              'hidden md:flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-semibold border transition',
+              'hidden md:flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10.5px] font-medium border transition',
               diagnostics.length === 0
                 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
                 : 'border-rose-500/50 bg-rose-500/20 text-rose-300 animate-pulse'
             )}
           >
-            <span>{diagnostics.length === 0 ? '✅' : '⚠️'}</span>
-            <span>{diagnostics.length === 0 ? '0 anomalie' : `${diagnostics.length} anomalie(s)`}</span>
+            <span>{diagnostics.length === 0 ? '✓' : '⚠️'}</span>
+            <span>{diagnostics.length === 0 ? 'Valide' : `${diagnostics.length} issue(s)`}</span>
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* BOUTON ARCHITECTE IA CONVERSATIONNEL */}
+        <div className="flex items-center gap-1.5">
+          {/* Architecte IA */}
           <button
             type="button"
             onClick={() => setAiArchitectOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-rose-500 to-purple-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-lg hover:opacity-90 transition active:scale-95"
+            className="inline-flex items-center gap-1 rounded-lg bg-gradient-to-r from-amber-500 to-purple-600 px-2.5 py-1 text-[11px] font-bold text-white shadow hover:opacity-90 transition active:scale-95"
           >
             <span>✨</span>
             <span>Architecte IA</span>
           </button>
 
-          {/* Bouton Aligner l'arbre */}
+          {/* Aligner */}
           <button
             type="button"
             onClick={autoLayoutTree}
-            className="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-white/20 transition active:scale-95"
-            title="Ranger automatiquement tous les blocs"
+            className="hidden sm:inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-white/20 transition active:scale-95"
           >
-            <span>✨</span>
-            <span>Aligner</span>
+            <span>✨ Aligner</span>
           </button>
 
-          {/* Menu Export / Import */}
-          <div className="hidden lg:flex items-center gap-1">
-            <button
-              type="button"
-              onClick={exportWorkflowJson}
-              className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-white/80 hover:bg-white/10 hover:text-white"
-            >
-              📤 Export
-            </button>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs text-white/80 hover:bg-white/10 hover:text-white"
-            >
-              📥 Import
-            </button>
-          </div>
+          {/* Export / Import */}
+          <button
+            type="button"
+            onClick={exportWorkflowJson}
+            className="hidden lg:inline-flex rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10.5px] text-white/70 hover:bg-white/10 hover:text-white"
+            title="Exporter JSON"
+          >
+            📤
+          </button>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="hidden lg:inline-flex rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10.5px] text-white/70 hover:bg-white/10 hover:text-white"
+            title="Importer JSON"
+          >
+            📥
+          </button>
 
-          {/* Bouton Ajouter Bloc */}
+          {/* Ajouter Bloc */}
           <button
             type="button"
             onClick={() => setPaletteOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-white/20 transition active:scale-95"
+            className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-white/20 transition active:scale-95"
           >
-            <span>+</span>
-            <span>Bloc</span>
+            <span>+ Bloc</span>
           </button>
 
-          {/* Bouton Tester le Workflow */}
+          {/* Tester */}
           <button
             type="button"
             onClick={startSimulator}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-lg hover:from-blue-500 hover:to-indigo-500 transition active:scale-95"
+            className="inline-flex items-center gap-1 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-3 py-1 text-[11px] font-semibold text-white shadow hover:from-blue-500 hover:to-indigo-500 transition active:scale-95"
           >
-            <span>🧪</span>
-            <span>Tester</span>
+            <span>🧪 Tester</span>
           </button>
 
-          {/* Bouton Enregistrer */}
+          {/* Enregistrer */}
           <button
             type="button"
             onClick={() => {
               onSave(workflow);
-              setSaveFeedback('💾 Sauvegardé avec succès !');
-              setTimeout(() => setSaveFeedback(null), 2500);
+              setSaveFeedback('💾 Enregistré !');
+              setTimeout(() => setSaveFeedback(null), 2000);
             }}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-lagoon-600 px-4 py-1.5 text-xs font-bold text-white shadow-glow-sm hover:bg-lagoon-500 transition active:scale-95"
+            className="inline-flex items-center gap-1 rounded-lg bg-lagoon-600 px-3 py-1 text-[11px] font-bold text-white shadow hover:bg-lagoon-500 transition active:scale-95"
           >
             <span>💾</span>
-            <span>{workflow.enabled ? 'Publier' : 'Enregistrer'}</span>
+            <span>{workflow.enabled ? 'Publier' : 'Sauver'}</span>
           </button>
         </div>
       </header>
 
-      {/* Toast de confirmation */}
+      {/* Toast confirmation */}
       {saveFeedback && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 rounded-2xl border border-emerald-500/50 bg-emerald-950/90 px-4 py-2 text-xs font-bold text-emerald-200 shadow-2xl backdrop-blur-md animate-slide-up">
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-50 rounded-xl border border-emerald-500/50 bg-emerald-950/90 px-3 py-1.5 text-xs font-bold text-emerald-200 shadow-xl backdrop-blur-md animate-slide-up">
           {saveFeedback}
         </div>
       )}
@@ -819,7 +800,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
         onWheel={handleWheel}
         className={cn(
           'relative flex-1 cursor-grab overflow-hidden active:cursor-grabbing',
-          'bg-[radial-gradient(#ffffff15_1px,transparent_1px)] [background-size:24px_24px]'
+          'bg-[radial-gradient(#ffffff12_1px,transparent_1px)] [background-size:20px_20px]'
         )}
       >
         <div
@@ -829,16 +810,16 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
           }}
           className="absolute inset-0 w-full h-full pointer-events-none"
         >
-          {/* SVG des Câbles de connexion */}
+          {/* Câbles SVG fins et élégants */}
           <svg className="absolute inset-0 w-[5000px] h-[5000px] pointer-events-none overflow-visible">
             <defs>
               <marker
                 id="flow-arrow-default"
                 viewBox="0 0 10 10"
-                refX="7"
+                refX="6"
                 refY="5"
-                markerWidth="6"
-                markerHeight="6"
+                markerWidth="5"
+                markerHeight="5"
                 orient="auto-start-reverse"
               >
                 <path d="M 0 1 L 8 5 L 0 9 z" fill="#38bdf8" />
@@ -847,18 +828,18 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
               <marker
                 id="flow-arrow-active"
                 viewBox="0 0 10 10"
-                refX="7"
+                refX="6"
                 refY="5"
-                markerWidth="7"
-                markerHeight="7"
+                markerWidth="6"
+                markerHeight="6"
                 orient="auto-start-reverse"
               >
                 <path d="M 0 1 L 8 5 L 0 9 z" fill="#10b981" />
               </marker>
 
               <linearGradient id="cable-gradient-default" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.8" />
-                <stop offset="100%" stopColor="#818cf8" stopOpacity="0.8" />
+                <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.75" />
+                <stop offset="100%" stopColor="#818cf8" stopOpacity="0.75" />
               </linearGradient>
 
               <linearGradient id="cable-gradient-active" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -867,7 +848,6 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
               </linearGradient>
             </defs>
 
-            {/* Rendu des flèches */}
             {workflow.edges.map((edge) => {
               const src = workflow.nodes.find((n) => n.id === edge.source);
               const tgt = workflow.nodes.find((n) => n.id === edge.target);
@@ -880,7 +860,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
               const x2 = tgt.position.x + nodeWidth / 2;
               const y2 = tgt.position.y;
 
-              const deltaY = Math.max(40, (y2 - y1) / 2);
+              const deltaY = Math.max(30, (y2 - y1) / 2);
               const pathD = `M ${x1} ${y1} C ${x1} ${y1 + deltaY}, ${x2} ${y2 - deltaY}, ${x2} ${y2}`;
 
               return (
@@ -889,18 +869,18 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                     d={pathD}
                     fill="none"
                     stroke={isEdgeActive ? 'url(#cable-gradient-active)' : 'url(#cable-gradient-default)'}
-                    strokeWidth={isEdgeActive ? '4.5' : '2.5'}
+                    strokeWidth={isEdgeActive ? '3.5' : '1.8'}
                     markerEnd={isEdgeActive ? 'url(#flow-arrow-active)' : 'url(#flow-arrow-default)'}
                     className={cn(
-                      'transition-all duration-300 cursor-pointer',
-                      isEdgeActive && 'filter drop-shadow-[0_0_10px_#10b981]',
-                      !isEdgeActive && 'hover:stroke-sun-500 hover:stroke-[3.5px]'
+                      'transition-all duration-200 cursor-pointer',
+                      isEdgeActive && 'filter drop-shadow-[0_0_8px_#10b981]',
+                      !isEdgeActive && 'hover:stroke-sun-500 hover:stroke-[2.5px]'
                     )}
                   />
                   <circle
                     cx={(x1 + x2) / 2}
                     cy={(y1 + y2) / 2}
-                    r={isEdgeActive ? '5' : '3'}
+                    r={isEdgeActive ? '4' : '2'}
                     fill={isEdgeActive ? '#10b981' : '#38bdf8'}
                     className={isEdgeActive ? 'animate-ping' : 'animate-pulse'}
                   />
@@ -909,7 +889,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
             })}
           </svg>
 
-          {/* Rendu des Nœuds */}
+          {/* Rendu des Nœuds COMPACTS & ÉPURÉS */}
           <div className="absolute inset-0 pointer-events-auto">
             {workflow.nodes.map((node) => {
               const isSelected = selectedNodeId === node.id;
@@ -932,33 +912,26 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                     width: `${nodeWidth}px`
                   }}
                   className={cn(
-                    'flow-node absolute rounded-2xl border transition-all duration-150 shadow-2xl backdrop-blur-md cursor-pointer select-none',
-                    isTestActive && 'ring-4 ring-sky-400 border-sky-400 bg-slate-900 scale-103 z-30 shadow-[0_0_25px_#38bdf866]',
-                    isError && 'ring-4 ring-rose-500 border-rose-500 bg-rose-950/40 z-30 animate-pulse',
-                    isVisited && !isTestActive && !isError && 'border-emerald-500/80 bg-slate-900/95 ring-1 ring-emerald-500/40',
-                    isSelected && !isTestActive && !isError && 'border-lagoon-400 ring-2 ring-lagoon-400/50 bg-slate-900/95 scale-102 z-20',
-                    !isSelected && !isTestActive && !isVisited && !isError && 'border-white/10 bg-slate-900/85 hover:border-white/30 z-10'
+                    'flow-node absolute rounded-xl border transition-all duration-100 shadow-lg backdrop-blur-md cursor-pointer select-none',
+                    isTestActive && 'ring-3 ring-sky-400 border-sky-400 bg-slate-900 scale-102 z-30 shadow-[0_0_20px_#38bdf855]',
+                    isError && 'ring-3 ring-rose-500 border-rose-500 bg-rose-950/40 z-30 animate-pulse',
+                    isVisited && !isTestActive && !isError && 'border-emerald-500/70 bg-slate-900/90',
+                    isSelected && !isTestActive && !isError && 'border-lagoon-400 ring-2 ring-lagoon-400/40 bg-slate-900 scale-101 z-20',
+                    !isSelected && !isTestActive && !isVisited && !isError && 'border-white/10 bg-slate-900/80 hover:border-white/25 z-10'
                   )}
                 >
-                  {isTestActive && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-sky-500 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-950 shadow-lg flex items-center gap-1 animate-pulse">
-                      <span>🟢</span>
-                      <span>En cours d'exécution</span>
-                    </div>
-                  )}
-
-                  {/* En-tête */}
+                  {/* En-tête fin */}
                   <div
                     className={cn(
-                      'flex items-center justify-between rounded-t-2xl px-3.5 py-2 text-xs font-bold border-b border-white/10',
-                      node.type === 'trigger' && 'bg-amber-500/20 text-amber-300',
-                      node.type === 'message' && 'bg-emerald-500/20 text-emerald-300',
-                      node.type === 'buttons' && 'bg-sky-500/20 text-sky-300',
-                      node.type === 'condition' && 'bg-rose-500/20 text-rose-300',
-                      node.type === 'action' && 'bg-purple-500/20 text-purple-300'
+                      'flex items-center justify-between rounded-t-xl px-2.5 py-1.5 text-[11px] font-bold border-b border-white/10',
+                      node.type === 'trigger' && 'bg-amber-500/15 text-amber-300',
+                      node.type === 'message' && 'bg-emerald-500/15 text-emerald-300',
+                      node.type === 'buttons' && 'bg-sky-500/15 text-sky-300',
+                      node.type === 'condition' && 'bg-rose-500/15 text-rose-300',
+                      node.type === 'action' && 'bg-purple-500/15 text-purple-300'
                     )}
                   >
-                    <div className="flex items-center gap-1.5 truncate">
+                    <div className="flex items-center gap-1 truncate">
                       <span>
                         {node.type === 'trigger' && '⚡'}
                         {node.type === 'message' && '💬'}
@@ -969,24 +942,21 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                       <span className="truncate">{node.title}</span>
                     </div>
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-0.5">
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           duplicateNode(node.id);
                         }}
-                        className="text-white/40 hover:text-sky-300 rounded px-1 transition text-[10px]"
-                        title="Dupliquer ce bloc"
+                        className="text-white/30 hover:text-sky-300 px-0.5 text-[9px]"
+                        title="Dupliquer"
                       >
                         📋
                       </button>
 
                       {hasIssues && (
-                        <span
-                          title={nodeIssues.map((i) => i.message).join('\n')}
-                          className="rounded-full bg-rose-500/30 text-rose-300 text-[10px] px-1 py-0.2 border border-rose-500/50"
-                        >
+                        <span className="rounded-full bg-rose-500/30 text-rose-300 text-[9px] px-1 border border-rose-500/50">
                           ⚠️
                         </span>
                       )}
@@ -997,39 +967,32 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                           e.stopPropagation();
                           deleteNode(node.id);
                         }}
-                        className="text-white/40 hover:text-rose-400 rounded px-1 transition text-[11px]"
-                        title="Supprimer ce bloc"
+                        className="text-white/30 hover:text-rose-400 px-0.5 text-[10px]"
+                        title="Supprimer"
                       >
                         ✕
                       </button>
                     </div>
                   </div>
 
-                  {/* Corps */}
-                  <div className="p-3 text-xs space-y-2 text-white/80">
+                  {/* Corps épuré */}
+                  <div className="p-2 text-[10.5px] space-y-1.5 text-white/80">
                     {node.type === 'trigger' && (
-                      <div className="space-y-1">
-                        <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-[10.5px] font-mono text-amber-300 block truncate">
-                          Intention : {node.data.triggerValue || 'Toute intention'}
-                        </span>
-                        {node.data.keywords && node.data.keywords.length > 0 && (
-                          <p className="text-[10px] text-white/50 truncate">
-                            Mots : {node.data.keywords.slice(0, 3).join(', ')}
-                          </p>
-                        )}
-                      </div>
+                      <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-mono text-amber-300 block truncate">
+                        {node.data.triggerValue || 'Intention IA'}
+                      </span>
                     )}
 
                     {node.type === 'message' && (
-                      <p className="text-[11.5px] leading-relaxed text-white/90 line-clamp-3 italic">
-                        « {node.data.message || 'Texte du message…'} »
+                      <p className="text-[10.5px] leading-snug text-white/85 line-clamp-2 italic">
+                        « {node.data.message || 'Message…'} »
                       </p>
                     )}
 
                     {node.type === 'buttons' && (
-                      <div className="space-y-1.5">
-                        <p className="text-[11px] font-medium text-white/70 line-clamp-1">{node.data.question}</p>
-                        <div className="space-y-1">
+                      <div className="space-y-1">
+                        <p className="text-[10px] text-white/60 line-clamp-1">{node.data.question}</p>
+                        <div className="space-y-0.5">
                           {(node.data.options || []).map((opt) => {
                             const isOptionChosen = selectedOptionIds[node.id] === opt.id;
                             const isOptConnected =
@@ -1040,19 +1003,16 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                               <div
                                 key={opt.id}
                                 className={cn(
-                                  'flex items-center justify-between rounded-lg px-2 py-1 text-[10.5px] font-medium border transition-all',
+                                  'flex items-center justify-between rounded px-1.5 py-0.5 text-[9.5px] border transition-all',
                                   isOptionChosen
-                                    ? 'bg-emerald-500 text-slate-950 font-bold border-emerald-300 shadow-[0_0_12px_#10b981]'
+                                    ? 'bg-emerald-500 text-slate-950 font-bold border-emerald-300'
                                     : isOptConnected
-                                      ? 'bg-sky-500/15 text-sky-200 border-sky-500/30'
-                                      : 'bg-rose-500/20 text-rose-200 border-rose-500/40 border-dashed'
+                                      ? 'bg-sky-500/10 text-sky-200 border-sky-500/20'
+                                      : 'bg-rose-500/15 text-rose-200 border-rose-500/30 border-dashed'
                                 )}
                               >
-                                <span className="truncate flex items-center gap-1">
-                                  {isOptionChosen && <span>✓</span>}
-                                  <span>{opt.label}</span>
-                                </span>
-                                <span className="text-[9px]">{isOptConnected ? '➔' : '⚠️ Non relié'}</span>
+                                <span className="truncate">{opt.label}</span>
+                                <span className="text-[8px]">{isOptConnected ? '➔' : '⚠️'}</span>
                               </div>
                             );
                           })}
@@ -1061,78 +1021,76 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                     )}
 
                     {node.type === 'condition' && (
-                      <div className="rounded-lg bg-rose-500/10 p-2 text-[10.5px] text-rose-200 border border-rose-500/20">
-                        <span>Horaires ouvrés : Ouvert / Fermé</span>
+                      <div className="rounded bg-rose-500/10 p-1 text-[10px] text-rose-200 border border-rose-500/20">
+                        <span>Horaires : Ouvert / Fermé</span>
                       </div>
                     )}
 
                     {node.type === 'action' && (
-                      <div className="rounded-lg bg-purple-500/10 p-2 text-[10.5px] text-purple-200 border border-purple-500/20 truncate">
-                        <span>{node.data.actionPayload || 'Action configurée'}</span>
+                      <div className="rounded bg-purple-500/10 p-1 text-[10px] text-purple-200 border border-purple-500/20 truncate">
+                        <span>{node.data.actionPayload || 'Action'}</span>
                       </div>
                     )}
                   </div>
 
-                  {/* Connecteur */}
+                  {/* Connecteur bas */}
                   <div
                     className={cn(
-                      'absolute -bottom-2 left-1/2 -translate-x-1/2 flex items-center justify-center h-4 w-4 rounded-full border-2 border-slate-900 shadow-md',
+                      'absolute -bottom-1.5 left-1/2 -translate-x-1/2 flex items-center justify-center h-3 w-3 rounded-full border border-slate-900 shadow-sm',
                       isVisited ? 'bg-emerald-500' : 'bg-sky-500'
                     )}
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                  </div>
+                  />
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* ── CONTRÔLES ZOOM ──────────────────────────────────────────────────── */}
-        <div className="canvas-ui absolute bottom-6 right-6 flex items-center gap-1 rounded-2xl border border-white/10 bg-slate-900/90 p-1.5 shadow-2xl backdrop-blur-md z-30">
+        {/* ── CONTRÔLES ZOOM DISCRETS ─────────────────────────────────────────── */}
+        <div className="canvas-ui absolute bottom-4 right-4 flex items-center gap-0.5 rounded-xl border border-white/10 bg-slate-900/90 p-1 shadow-xl backdrop-blur-md z-30 text-[11px]">
           <button
             type="button"
-            onClick={() => setZoom((z) => Math.max(0.4, Number((z - 0.15).toFixed(2))))}
-            className="flex h-8 w-8 items-center justify-center rounded-xl text-white/80 hover:bg-white/10 hover:text-white transition"
+            onClick={() => setZoom((z) => Math.max(0.4, Number((z - 0.1).toFixed(2))))}
+            className="flex h-6 w-6 items-center justify-center rounded text-white/70 hover:bg-white/10 hover:text-white"
           >
             -
           </button>
-          <span className="w-12 text-center text-xs font-mono font-bold text-white/80">
+          <span className="w-10 text-center font-mono font-semibold text-white/80">
             {Math.round(zoom * 100)}%
           </span>
           <button
             type="button"
-            onClick={() => setZoom((z) => Math.min(1.8, Number((z + 0.15).toFixed(2))))}
-            className="flex h-8 w-8 items-center justify-center rounded-xl text-white/80 hover:bg-white/10 hover:text-white transition"
+            onClick={() => setZoom((z) => Math.min(1.6, Number((z + 0.1).toFixed(2))))}
+            className="flex h-6 w-6 items-center justify-center rounded text-white/70 hover:bg-white/10 hover:text-white"
           >
             +
           </button>
-          <div className="h-4 w-px bg-white/10 mx-1" />
+          <div className="h-3 w-px bg-white/10 mx-0.5" />
           <button
             type="button"
             onClick={() => {
-              setZoom(1);
-              setPan({ x: 0, y: 0 });
+              setZoom(0.95);
+              setPan({ x: 40, y: 30 });
             }}
-            className="px-2.5 py-1 text-xs font-semibold text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition"
+            className="px-2 py-0.5 text-[10.5px] font-semibold text-white/70 hover:text-white hover:bg-white/10 rounded"
           >
             Centrer
           </button>
         </div>
 
-        {/* ── MINI-MAP ───────────────────────────────────────────────────────── */}
-        <div className="canvas-ui absolute bottom-6 left-6 h-28 w-36 rounded-2xl border border-white/15 bg-slate-900/90 p-2 shadow-2xl backdrop-blur-md z-30 overflow-hidden hidden sm:block">
-          <p className="text-[9px] font-bold uppercase tracking-wider text-white/40 mb-1">Aperçu du Flux</p>
+        {/* ── MINI-MAP DISCRÈTE ───────────────────────────────────────────────── */}
+        <div className="canvas-ui absolute bottom-4 left-4 h-24 w-32 rounded-xl border border-white/10 bg-slate-900/90 p-1.5 shadow-xl backdrop-blur-md z-30 overflow-hidden hidden sm:block">
+          <p className="text-[8px] font-bold uppercase tracking-wider text-white/30 mb-0.5">Aperçu</p>
           <div className="relative h-full w-full">
             {workflow.nodes.map((n) => (
               <div
                 key={n.id}
                 style={{
-                  left: `${Math.min(95, Math.max(5, (n.position.x / 1400) * 100))}%`,
-                  top: `${Math.min(95, Math.max(5, (n.position.y / 1000) * 100))}%`
+                  left: `${Math.min(95, Math.max(5, (n.position.x / 1200) * 100))}%`,
+                  top: `${Math.min(95, Math.max(5, (n.position.y / 900) * 100))}%`
                 }}
                 className={cn(
-                  'absolute h-2 w-3 rounded-xs transition',
+                  'absolute h-1.5 w-2.5 rounded-xs transition',
                   n.type === 'trigger' && 'bg-amber-400',
                   n.type === 'message' && 'bg-emerald-400',
                   n.type === 'buttons' && 'bg-sky-400',
@@ -1145,41 +1103,32 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
         </div>
       </div>
 
-      {/* ── MODALE ARCHITECTE IA CONVERSATIONNEL (PROMPT-TO-WORKFLOW) ───────── */}
+      {/* ── MODALE ARCHITECTE IA (PROMPT-TO-FLOW) ───────────────────────────── */}
       {aiArchitectOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in">
-          <div className="w-full max-w-2xl rounded-3xl border border-white/20 bg-slate-900 shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-white/10 bg-slate-900/95 px-5 py-3.5">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 to-purple-600 text-sm shadow-md">
+          <div className="w-full max-w-xl rounded-2xl border border-white/15 bg-slate-900 shadow-2xl flex flex-col max-h-[80vh] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-white/10 bg-slate-900/95 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-tr from-amber-500 to-purple-600 text-xs">
                   ✨
-                </div>
-                <div>
-                  <h3 className="font-display text-sm font-bold text-white">
-                    Architecte IA Mistral — Prompt-to-Workflow
-                  </h3>
-                  <p className="text-[11px] text-white/50">
-                    Décrivez votre idée en français, l'IA vous conseille et génère tout l'arbre décisionnel.
-                  </p>
-                </div>
+                </span>
+                <h3 className="font-display text-xs font-bold text-white">Architecte IA Mistral</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setAiArchitectOpen(false)}
-                className="rounded-xl p-1.5 text-white/40 hover:text-white hover:bg-white/10"
+                className="rounded p-1 text-white/40 hover:text-white"
               >
                 ✕
               </button>
             </div>
 
-            {/* Suggestions rapides si début */}
             {aiMessages.length <= 1 && (
-              <div className="bg-slate-950/50 p-3 border-b border-white/10 space-y-1.5">
-                <p className="text-[10.5px] font-bold text-white/50 uppercase tracking-wider">
-                  💡 Idées de départ rapides (1-clic) :
+              <div className="bg-slate-950/40 p-2.5 border-b border-white/10 space-y-1">
+                <p className="text-[10px] font-bold text-white/40 uppercase tracking-wider">
+                  💡 Suggestions rapides :
                 </p>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-1">
                   <button
                     type="button"
                     onClick={() =>
@@ -1187,9 +1136,9 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                         'Je veux un scénario de qualification de devis : demander si Particulier ou Entreprise, le budget, puis taguer et alerter les commerciaux.'
                       )
                     }
-                    className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/80 hover:bg-white/15 hover:text-white transition text-left"
+                    className="rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-[10.5px] text-white/80 hover:bg-white/15 transition text-left"
                   >
-                    🏢 Qualification Devis Commercial
+                    🏢 Qualification Devis
                   </button>
                   <button
                     type="button"
@@ -1198,41 +1147,26 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                         'Je veux un scénario e-commerce pour les retours produits 14 jours : vérifier l’état du colis, demander le numéro de commande et orienter.'
                       )
                     }
-                    className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/80 hover:bg-white/15 hover:text-white transition text-left"
+                    className="rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-[10.5px] text-white/80 hover:bg-white/15 transition text-left"
                   >
-                    📦 Retours & SAV 14 Jours
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleSendAiPrompt(
-                        'Je veux un scénario d’accueil hors horaires le soir et week-end : informer de l’absence et collecter email/téléphone pour rappel à 9h.'
-                      )
-                    }
-                    className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/80 hover:bg-white/15 hover:text-white transition text-left"
-                  >
-                    🌙 Accueil Hors Horaires & Nuit
+                    📦 Retours 14 Jours
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Fil de discussion */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 text-xs">
+            <div className="flex-1 overflow-y-auto p-3.5 space-y-2.5 text-xs">
               {aiMessages.map((msg, i) => (
                 <div
                   key={i}
-                  className={cn(
-                    'flex flex-col gap-1',
-                    msg.role === 'user' ? 'items-end' : 'items-start'
-                  )}
+                  className={cn('flex flex-col gap-1', msg.role === 'user' ? 'items-end' : 'items-start')}
                 >
                   <div
                     className={cn(
-                      'rounded-2xl px-4 py-3 max-w-[85%] leading-relaxed',
+                      'rounded-xl px-3 py-2 max-w-[85%] leading-relaxed text-[11.5px]',
                       msg.role === 'user'
-                        ? 'bg-blue-600 text-white font-medium shadow-sm'
-                        : 'bg-slate-800/90 text-white/90 border border-white/10 shadow-sm'
+                        ? 'bg-blue-600 text-white font-medium'
+                        : 'bg-slate-800 text-white/90 border border-white/10'
                     )}
                   >
                     <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -1240,65 +1174,52 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                 </div>
               ))}
 
-              {/* État de chargement */}
               {aiLoading && (
-                <div className="flex items-center gap-2 text-xs text-white/60 p-2">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-amber-400 border-t-transparent" />
-                  <span>L'Architecte IA analyse et conçoit votre arbre décisionnel...</span>
+                <div className="flex items-center gap-2 text-[11px] text-white/60 p-1">
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-amber-400 border-t-transparent" />
+                  <span>Conception de l'arbre décisionnel en cours...</span>
                 </div>
               )}
 
-              {/* Carte de déploiement si prêt */}
               {aiGeneratedWf && !aiLoading && (
-                <div className="rounded-2xl border border-emerald-500/40 bg-emerald-950/30 p-4 space-y-3 animate-slide-up shadow-xl">
+                <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/25 p-3 space-y-2 animate-slide-up">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">🎉</span>
-                      <div>
-                        <h4 className="font-display text-sm font-bold text-white">
-                          {aiGeneratedWf.name}
-                        </h4>
-                        <p className="text-[11px] text-emerald-300">
-                          {aiGeneratedWf.nodes.length} nœuds générés · {aiGeneratedWf.edges.length} connexions automatiques
-                        </p>
-                      </div>
-                    </div>
+                    <h4 className="font-display text-xs font-bold text-white">{aiGeneratedWf.name}</h4>
+                    <span className="text-[10px] text-emerald-300">
+                      {aiGeneratedWf.nodes.length} blocs · {aiGeneratedWf.edges.length} liens
+                    </span>
                   </div>
-
-                  <p className="text-xs text-white/70 leading-relaxed">{aiGeneratedWf.description}</p>
-
+                  <p className="text-[11px] text-white/70 line-clamp-2">{aiGeneratedWf.description}</p>
                   <button
                     type="button"
                     onClick={applyGeneratedWorkflow}
-                    className="w-full rounded-xl bg-gradient-to-r from-emerald-500 to-lagoon-500 py-2.5 text-xs font-bold text-slate-950 shadow-glow transition hover:opacity-90 active:scale-98 flex items-center justify-center gap-2"
+                    className="w-full rounded-lg bg-gradient-to-r from-emerald-500 to-lagoon-500 py-2 text-xs font-bold text-slate-950 transition hover:opacity-90 active:scale-98"
                   >
-                    <span>🚀 Déployer sur le Canvas & Tester en Direct</span>
-                    <span>&rarr;</span>
+                    🚀 Déployer sur le Canvas & Tester en Direct &rarr;
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Zone de saisie */}
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 handleSendAiPrompt();
               }}
-              className="border-t border-white/10 bg-slate-900/95 p-3 flex items-center gap-2"
+              className="border-t border-white/10 bg-slate-900/95 p-2.5 flex items-center gap-1.5"
             >
               <input
                 type="text"
                 value={aiInput}
                 onChange={(e) => setAiInput(e.target.value)}
-                placeholder="Décrivez votre scénario ou répondez aux questions de l'IA..."
+                placeholder="Décrivez votre scénario..."
                 disabled={aiLoading}
-                className="flex-1 rounded-xl border border-white/15 bg-slate-800 px-3.5 py-2.5 text-xs text-white outline-none focus:border-lagoon-400 placeholder:text-white/40"
+                className="flex-1 rounded-lg border border-white/15 bg-slate-800 px-3 py-2 text-xs text-white outline-none focus:border-lagoon-400"
               />
               <button
                 type="submit"
                 disabled={aiLoading || !aiInput.trim()}
-                className="rounded-xl bg-gradient-to-r from-amber-500 to-purple-600 px-4 py-2.5 text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-40 active:scale-95 shadow-md shrink-0"
+                className="rounded-lg bg-gradient-to-r from-amber-500 to-purple-600 px-3 py-2 text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-40"
               >
                 Envoyer
               </button>
@@ -1307,108 +1228,64 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
         </div>
       )}
 
-      {/* ── TIROIR D'AFFICHAGE DES DIAGNOSTICS & ANOMALIES ─────────────────── */}
-      {diagnosticsOpen && (
-        <div className="absolute top-16 left-6 z-50 w-84 sm:w-96 rounded-3xl border border-rose-500/30 bg-slate-900/95 shadow-2xl backdrop-blur-2xl p-4 space-y-3 animate-slide-up">
-          <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
-            <div className="flex items-center gap-2">
-              <span className="text-sm">🔍</span>
-              <h3 className="font-display text-xs font-bold text-white">Diagnostics & Impasses</h3>
-            </div>
-            <button
-              type="button"
-              onClick={() => setDiagnosticsOpen(false)}
-              className="rounded-lg p-1 text-white/40 hover:text-white"
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="max-h-64 overflow-y-auto space-y-2 text-xs">
-            {diagnostics.length === 0 ? (
-              <p className="text-emerald-300 py-3 text-center">
-                ✨ Aucune anomalie détectée ! Tous vos blocs et boutons sont correctement reliés.
-              </p>
-            ) : (
-              diagnostics.map((d, i) => (
-                <div
-                  key={i}
-                  onClick={() => focusOnNode(d.nodeId)}
-                  className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-2.5 cursor-pointer hover:bg-rose-500/20 transition space-y-1"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-rose-300">{d.nodeTitle}</span>
-                    <span className="text-[10px] text-sky-300 underline">Voir le bloc &rarr;</span>
-                  </div>
-                  <p className="text-[11px] text-white/70">{d.message}</p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── TIROIR D'ÉDITION DU BLOC SÉLECTIONNÉ ───────────────────────────── */}
+      {/* ── TIROIR PROPRIÉTÉS DU BLOC SÉLECTIONNÉ ────────────────────────────── */}
       {selectedNode && (
-        <div className="absolute top-14 right-0 bottom-0 w-80 sm:w-96 border-l border-white/10 bg-slate-900/95 p-5 shadow-2xl backdrop-blur-xl z-40 overflow-y-auto space-y-4 animate-slide-left">
-          <div className="flex items-center justify-between border-b border-white/10 pb-3">
-            <div>
-              <h3 className="font-display text-sm font-bold text-white">⚙️ Propriétés du bloc</h3>
-              <p className="text-xs text-white/50">Configurez le comportement et les connexions</p>
-            </div>
+        <div className="absolute top-12 right-0 bottom-0 w-72 sm:w-80 border-l border-white/10 bg-slate-900/95 p-4 shadow-2xl backdrop-blur-xl z-40 overflow-y-auto space-y-3 animate-slide-left text-xs">
+          <div className="flex items-center justify-between border-b border-white/10 pb-2">
+            <h3 className="font-display text-xs font-bold text-white">⚙️ Propriétés du bloc</h3>
             <button
               type="button"
               onClick={() => setSelectedNodeId(null)}
-              className="rounded-lg p-1 text-white/40 hover:text-white hover:bg-white/10"
+              className="rounded p-1 text-white/40 hover:text-white"
             >
               ✕
             </button>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             <div>
-              <label className="text-xs font-semibold text-white/80 block mb-1">Titre du bloc</label>
+              <label className="text-[11px] font-semibold text-white/80 block mb-1">Titre</label>
               <input
                 type="text"
                 value={selectedNode.title}
                 onChange={(e) => updateSelectedNode({ title: e.target.value })}
-                className="w-full rounded-xl border border-white/15 bg-slate-800 px-3 py-2 text-xs text-white outline-none focus:border-lagoon-400"
+                className="w-full rounded-lg border border-white/15 bg-slate-800 px-2.5 py-1.5 text-xs text-white outline-none focus:border-lagoon-400"
               />
             </div>
 
             {selectedNode.type === 'message' && (
               <div>
-                <label className="text-xs font-semibold text-white/80 block mb-1">Message envoyé par le bot</label>
+                <label className="text-[11px] font-semibold text-white/80 block mb-1">Message</label>
                 <textarea
-                  rows={5}
+                  rows={4}
                   value={selectedNode.data.message || ''}
                   onChange={(e) => updateSelectedData({ message: e.target.value })}
-                  placeholder="Rédigez le texte du message..."
-                  className="w-full rounded-xl border border-white/15 bg-slate-800 p-3 text-xs text-white outline-none focus:border-lagoon-400 leading-relaxed font-sans"
+                  placeholder="Texte..."
+                  className="w-full rounded-lg border border-white/15 bg-slate-800 p-2.5 text-xs text-white outline-none focus:border-lagoon-400 leading-relaxed font-sans"
                 />
               </div>
             )}
 
             {selectedNode.type === 'buttons' && (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 <div>
-                  <label className="text-xs font-semibold text-white/80 block mb-1">Question posée au visiteur</label>
+                  <label className="text-[11px] font-semibold text-white/80 block mb-1">Question</label>
                   <input
                     type="text"
                     value={selectedNode.data.question || ''}
                     onChange={(e) => updateSelectedData({ question: e.target.value })}
-                    className="w-full rounded-xl border border-white/15 bg-slate-800 px-3 py-2 text-xs text-white outline-none focus:border-lagoon-400"
+                    className="w-full rounded-lg border border-white/15 bg-slate-800 px-2.5 py-1.5 text-xs text-white outline-none focus:border-lagoon-400"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-white/80 block mb-1.5">
-                    Boutons de choix proposés (Bifurcations)
+                  <label className="text-[11px] font-semibold text-white/80 block mb-1">
+                    Boutons de choix
                   </label>
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     {(selectedNode.data.options || []).map((opt, idx) => (
-                      <div key={opt.id} className="rounded-xl border border-white/10 bg-slate-800/80 p-2.5 space-y-2">
-                        <div className="flex items-center gap-2">
+                      <div key={opt.id} className="rounded-lg border border-white/10 bg-slate-800/80 p-2 space-y-1.5">
+                        <div className="flex items-center gap-1.5">
                           <input
                             type="text"
                             value={opt.label}
@@ -1417,7 +1294,7 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                               newOpts[idx] = { ...opt, label: e.target.value };
                               updateSelectedData({ options: newOpts });
                             }}
-                            className="flex-1 rounded-lg border border-white/15 bg-slate-900 px-2.5 py-1 text-xs text-white"
+                            className="flex-1 rounded border border-white/15 bg-slate-900 px-2 py-0.5 text-xs text-white"
                           />
                           <button
                             type="button"
@@ -1425,14 +1302,14 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                               const newOpts = (selectedNode.data.options || []).filter((_, i) => i !== idx);
                               updateSelectedData({ options: newOpts });
                             }}
-                            className="text-white/40 hover:text-rose-400 text-xs px-1"
+                            className="text-white/40 hover:text-rose-400 text-xs px-0.5"
                           >
                             ✕
                           </button>
                         </div>
 
-                        <div className="flex items-center gap-1.5 text-[11px] text-white/60">
-                          <span>Branche vers :</span>
+                        <div className="flex items-center gap-1 text-[10.5px] text-white/60">
+                          <span>Vers :</span>
                           <select
                             value={opt.targetNodeId || ''}
                             onChange={(e) => {
@@ -1456,9 +1333,9 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                                 return { ...prev, edges: filteredEdges };
                               });
                             }}
-                            className="flex-1 rounded-lg border border-white/15 bg-slate-900 px-2 py-1 text-[11px] text-sky-300"
+                            className="flex-1 rounded border border-white/15 bg-slate-900 px-1.5 py-0.5 text-[10px] text-sky-300 truncate"
                           >
-                            <option value="">-- Aucun nœud connecté (Impasse) --</option>
+                            <option value="">-- Non connecté --</option>
                             {workflow.nodes
                               .filter((n) => n.id !== selectedNode.id)
                               .map((n) => (
@@ -1480,9 +1357,9 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                         ];
                         updateSelectedData({ options: newOpts });
                       }}
-                      className="w-full rounded-xl border border-dashed border-white/20 py-2 text-xs font-semibold text-white/70 hover:text-white hover:border-white/40 transition"
+                      className="w-full rounded-lg border border-dashed border-white/20 py-1 text-[11px] font-semibold text-white/70 hover:text-white transition"
                     >
-                      + Ajouter un bouton de choix
+                      + Ajouter un choix
                     </button>
                   </div>
                 </div>
@@ -1490,31 +1367,31 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
             )}
 
             {selectedNode.type === 'action' && (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <div>
-                  <label className="text-xs font-semibold text-white/80 block mb-1">Type d&apos;action</label>
+                  <label className="text-[11px] font-semibold text-white/80 block mb-1">Action</label>
                   <select
                     value={selectedNode.data.actionType || 'add_tag'}
                     onChange={(e) => updateSelectedData({ actionType: e.target.value as any })}
-                    className="w-full rounded-xl border border-white/15 bg-slate-800 px-3 py-2 text-xs text-white"
+                    className="w-full rounded-lg border border-white/15 bg-slate-800 px-2 py-1.5 text-xs text-white"
                   >
-                    <option value="add_tag">🏷️ Appliquer un tag</option>
-                    <option value="assign_agent">🧑‍💻 Assigner un conseiller</option>
-                    <option value="add_internal_note">🔒 Ajouter une note interne privée</option>
-                    <option value="suggest_call">📞 Proposer un appel Quicktalk</option>
-                    <option value="send_webhook">🌐 Déclencher un Webhook</option>
-                    <option value="resolve_conversation">✅ Clôturer la conversation</option>
+                    <option value="add_tag">🏷️ Taguer</option>
+                    <option value="assign_agent">🧑‍💻 Assigner conseiller</option>
+                    <option value="add_internal_note">🔒 Note interne</option>
+                    <option value="suggest_call">📞 Proposer appel</option>
+                    <option value="send_webhook">🌐 Webhook</option>
+                    <option value="resolve_conversation">✅ Clôturer</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-white/80 block mb-1">Paramètre / Payload</label>
+                  <label className="text-[11px] font-semibold text-white/80 block mb-1">Valeur</label>
                   <input
                     type="text"
                     value={selectedNode.data.actionPayload || ''}
                     onChange={(e) => updateSelectedData({ actionPayload: e.target.value })}
-                    placeholder="Nom du tag, URL ou texte..."
-                    className="w-full rounded-xl border border-white/15 bg-slate-800 px-3 py-2 text-xs text-white"
+                    placeholder="Nom du tag, texte..."
+                    className="w-full rounded-lg border border-white/15 bg-slate-800 px-2.5 py-1.5 text-xs text-white"
                   />
                 </div>
               </div>
@@ -1523,75 +1400,75 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
         </div>
       )}
 
-      {/* ── MODALE DE PALETTE D'AJOUT DE BLOCS ───────────────────────────────── */}
+      {/* ── MODALE PALETTE BLOCS ────────────────────────────────────────────── */}
       {paletteOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="w-full max-w-md rounded-3xl border border-white/15 bg-slate-900 p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 className="font-display text-base font-bold text-white">+ Ajouter un bloc au scénario</h3>
+          <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-slate-900 p-4 shadow-2xl space-y-3">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2">
+              <h3 className="font-display text-xs font-bold text-white">+ Ajouter un bloc</h3>
               <button
                 type="button"
                 onClick={() => setPaletteOpen(false)}
-                className="rounded-xl p-1.5 text-white/40 hover:text-white hover:bg-white/10"
+                className="rounded p-1 text-white/40 hover:text-white"
               >
                 ✕
               </button>
             </div>
 
-            <div className="grid gap-2.5">
+            <div className="grid gap-1.5">
               <button
                 type="button"
                 onClick={() => addNode('message')}
-                className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-800/80 p-3 text-left hover:border-emerald-400/50 hover:bg-emerald-500/10 transition"
+                className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-slate-800/80 p-2.5 text-left hover:border-emerald-400/50 hover:bg-emerald-500/10 transition"
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-lg text-emerald-300">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/20 text-sm">
                   💬
                 </div>
                 <div>
-                  <h4 className="font-display text-xs font-bold text-white">Message Bot</h4>
-                  <p className="text-[11px] text-white/60">Envoie une bulle de texte ou des consignes claires au visiteur.</p>
+                  <h4 className="text-xs font-bold text-white">Message Bot</h4>
+                  <p className="text-[10px] text-white/50">Envoie une réponse textuelle.</p>
                 </div>
               </button>
 
               <button
                 type="button"
                 onClick={() => addNode('buttons')}
-                className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-800/80 p-3 text-left hover:border-sky-400/50 hover:bg-sky-500/10 transition"
+                className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-slate-800/80 p-2.5 text-left hover:border-sky-400/50 hover:bg-sky-500/10 transition"
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/20 text-lg text-sky-300">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-500/20 text-sm">
                   🔘
                 </div>
                 <div>
-                  <h4 className="font-display text-xs font-bold text-white">Questions & Boutons de Choix</h4>
-                  <p className="text-[11px] text-white/60">Affiche des boutons cliquables (Oui/Non, Choix A/B/C) pour aiguiller le client.</p>
+                  <h4 className="text-xs font-bold text-white">Question & Choix</h4>
+                  <p className="text-[10px] text-white/50">Boutons cliquables pour aiguiller.</p>
                 </div>
               </button>
 
               <button
                 type="button"
                 onClick={() => addNode('condition')}
-                className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-800/80 p-3 text-left hover:border-rose-400/50 hover:bg-rose-500/10 transition"
+                className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-slate-800/80 p-2.5 text-left hover:border-rose-400/50 hover:bg-rose-500/10 transition"
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-500/20 text-lg text-rose-300">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-500/20 text-sm">
                   🔀
                 </div>
                 <div>
-                  <h4 className="font-display text-xs font-bold text-white">Condition SI / ALORS</h4>
-                  <p className="text-[11px] text-white/60">Évalue les horaires d&apos;ouverture, l&apos;appareil ou l&apos;URL visitée.</p>
+                  <h4 className="text-xs font-bold text-white">Condition Horaires</h4>
+                  <p className="text-[10px] text-white/50">Ouvert vs Nuit / Week-end.</p>
                 </div>
               </button>
 
               <button
                 type="button"
                 onClick={() => addNode('action')}
-                className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-800/80 p-3 text-left hover:border-purple-400/50 hover:bg-purple-500/10 transition"
+                className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-slate-800/80 p-2.5 text-left hover:border-purple-400/50 hover:bg-purple-500/10 transition"
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-500/20 text-lg text-purple-300">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-500/20 text-sm">
                   🚀
                 </div>
                 <div>
-                  <h4 className="font-display text-xs font-bold text-white">Action Métier</h4>
-                  <p className="text-[11px] text-white/60">Applique un tag, assigne un conseiller ou déclenche un webhook.</p>
+                  <h4 className="text-xs font-bold text-white">Action Métier</h4>
+                  <p className="text-[10px] text-white/50">Taguer, assigner, note interne.</p>
                 </div>
               </button>
             </div>
@@ -1599,24 +1476,21 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
         </div>
       )}
 
-      {/* ── SIMULATEUR AVEC SÉLECTEUR DE PERSONA ────────────────────────────── */}
+      {/* ── SIMULATEUR TEST COMPACT ─────────────────────────────────────────── */}
       {simulatorOpen && (
-        <div className="fixed top-16 right-6 z-50 w-84 sm:w-96 rounded-3xl border border-white/20 bg-slate-900/95 shadow-2xl backdrop-blur-2xl p-4 space-y-3 animate-slide-up flex flex-col max-h-[82vh]">
-          <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
-            <div className="flex items-center gap-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-500 text-xs">🧪</span>
-              <div>
-                <h3 className="font-display text-xs font-bold text-white">Surveillance & Test en Direct</h3>
-                <p className="text-[10px] text-sky-400">Le nœud actif brille en direct sur le canvas</p>
-              </div>
+        <div className="fixed top-14 right-4 z-50 w-80 rounded-2xl border border-white/15 bg-slate-900/95 shadow-2xl backdrop-blur-xl p-3 space-y-2 animate-slide-up flex flex-col max-h-[78vh] text-xs">
+          <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
+            <div className="flex items-center gap-1.5">
+              <span className="flex h-5 w-5 items-center justify-center rounded bg-blue-500 text-[10px]">🧪</span>
+              <h3 className="font-display text-xs font-bold text-white">Test en Direct</h3>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={startSimulator}
-                className="text-[11px] text-sky-400 hover:underline"
+                className="text-[10px] text-sky-400 hover:underline"
               >
-                Recommencer
+                Relancer
               </button>
               <button
                 type="button"
@@ -1626,71 +1500,64 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                   setActiveEdgeId(null);
                   setCurrentTestError(null);
                 }}
-                className="rounded-lg p-1 text-white/40 hover:text-white"
+                className="rounded p-0.5 text-white/40 hover:text-white"
               >
                 ✕
               </button>
             </div>
           </div>
 
-          {/* Sélecteur de Persona */}
-          <div className="rounded-2xl border border-white/10 bg-slate-800/80 p-2 text-xs flex items-center justify-between gap-2">
-            <span className="text-[10.5px] font-bold text-white/60">🎭 Contexte :</span>
-            <div className="flex items-center gap-1.5">
+          <div className="rounded-lg border border-white/10 bg-slate-800/70 p-1.5 text-[10px] flex items-center justify-between">
+            <span className="text-white/60 font-semibold">🎭 Mode :</span>
+            <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => {
                   setSimHoursMode('open');
-                  setTimeout(startSimulator, 100);
+                  setTimeout(startSimulator, 50);
                 }}
                 className={cn(
-                  'rounded-lg px-2 py-1 text-[10.5px] font-bold transition',
+                  'rounded px-1.5 py-0.5 text-[9.5px] font-bold transition',
                   simHoursMode === 'open'
-                    ? 'bg-emerald-500 text-slate-950 shadow-sm'
-                    : 'bg-slate-700 text-white/70 hover:text-white'
+                    ? 'bg-emerald-500 text-slate-950'
+                    : 'bg-slate-700 text-white/60 hover:text-white'
                 )}
-                title="Tester comme s'il était 14h (Support ouvert)"
               >
-                ☀️ Ouvert
+                ☀️ Jour
               </button>
               <button
                 type="button"
                 onClick={() => {
                   setSimHoursMode('closed');
-                  setTimeout(startSimulator, 100);
+                  setTimeout(startSimulator, 50);
                 }}
                 className={cn(
-                  'rounded-lg px-2 py-1 text-[10.5px] font-bold transition',
+                  'rounded px-1.5 py-0.5 text-[9.5px] font-bold transition',
                   simHoursMode === 'closed'
-                    ? 'bg-rose-500 text-white shadow-sm'
-                    : 'bg-slate-700 text-white/70 hover:text-white'
+                    ? 'bg-rose-500 text-white'
+                    : 'bg-slate-700 text-white/60 hover:text-white'
                 )}
-                title="Tester comme s'il était 22h ou le week-end (Support fermé)"
               >
                 🌙 Nuit
               </button>
             </div>
           </div>
 
-          {/* Bandeau d'alerte */}
           {currentTestError && (
-            <div className="rounded-xl border border-rose-500/50 bg-rose-500/20 p-2.5 text-xs text-rose-200 flex items-start gap-2 animate-shake">
+            <div className="rounded-lg border border-rose-500/50 bg-rose-500/20 p-2 text-[10.5px] text-rose-200 flex items-start gap-1.5">
               <span>🚨</span>
-              <div className="flex-1">
-                <span className="font-bold block">Anomalie détectée :</span>
-                <span className="text-[11px] leading-tight block">{currentTestError.message}</span>
-              </div>
+              <span>{currentTestError.message}</span>
             </div>
           )}
 
-          <div className="flex-1 overflow-y-auto space-y-2.5 p-1 text-xs">
+          <div className="flex-1 overflow-y-auto space-y-2 p-0.5 text-[11px]">
             {simHistory.map((item, idx) => (
-              <div key={idx} className={cn('flex flex-col gap-1', item.sender === 'visitor' ? 'items-end' : 'items-start')}>
+              <div key={idx} className={cn('flex flex-col gap-0.5', item.sender === 'visitor' ? 'items-end' : 'items-start')}>
                 <div
                   className={cn(
-                    'rounded-2xl px-3.5 py-2.5 max-w-[88%] leading-relaxed',
+                    'rounded-xl px-2.5 py-1.5 max-w-[90%] leading-relaxed',
                     item.sender === 'visitor'
-                      ? 'bg-blue-600 text-white font-medium shadow-sm'
+                      ? 'bg-blue-600 text-white font-medium'
                       : item.isError
                         ? 'bg-rose-950 border border-rose-500 text-rose-200'
                         : 'bg-slate-800 text-white/90 border border-white/10'
@@ -1699,18 +1566,17 @@ export function FlowCanvas({ workflow: initialWf, onSave, onClose }: FlowCanvasP
                   <p className="whitespace-pre-wrap">{item.text}</p>
                 </div>
 
-                {/* Boutons d'options */}
                 {item.options && item.options.length > 0 && (
-                  <div className="flex flex-col gap-1.5 w-full pt-1">
+                  <div className="flex flex-col gap-1 w-full pt-0.5">
                     {item.options.map((opt) => (
                       <button
                         key={opt.id}
                         type="button"
                         onClick={() => handleSimChoice(opt)}
-                        className="w-full rounded-xl border border-sky-500/40 bg-sky-500/15 py-2 px-3 text-xs font-semibold text-sky-200 hover:bg-sky-500/30 hover:border-sky-400 transition active:scale-98 text-left flex items-center justify-between"
+                        className="w-full rounded-lg border border-sky-500/30 bg-sky-500/10 py-1.5 px-2.5 text-[10.5px] font-medium text-sky-200 hover:bg-sky-500/25 transition active:scale-98 text-left flex items-center justify-between"
                       >
                         <span>{opt.label}</span>
-                        <span className="text-[10px] text-sky-400">Choisir ➔</span>
+                        <span className="text-[9px] text-sky-400">➔</span>
                       </button>
                     ))}
                   </div>
